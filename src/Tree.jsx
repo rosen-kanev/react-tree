@@ -3,20 +3,6 @@ import React, { useRef, createContext } from 'react';
 import TreeItem from './TreeItem';
 import TreeContext from './TreeContext';
 
-const findAvailableNodes = (nodes, expandedNodes) => {
-    const items = [];
-
-    for (const node of nodes) {
-        items.push(node);
-
-        if (expandedNodes.includes(node.id)) {
-            items.push(...findAvailableNodes(node.nodes, expandedNodes));
-        }
-    }
-
-    return items;
-};
-
 function Tree({ nodes, selected, focused, onFocusChange, expanded, onExpandChange, onSelect, renderLabel, ...rest }) {
     const rootEl = useRef(null);
 
@@ -30,23 +16,26 @@ function Tree({ nodes, selected, focused, onFocusChange, expanded, onExpandChang
     };
 
     const moveToTreeItem = (isPrev) => {
-        const available = findAvailableNodes(nodes, expanded);
-        const currentNodeIndex = available.findIndex((node) => node.id === focused);
+        const items = rootEl.current.querySelectorAll('[role="treeitem"]');
 
-        let nextIndex = isPrev ? 0 : 1;
+        let nextNode;
+        for (let i = 0; i < items.length; i++) {
+            const element = items[i];
 
-        if (currentNodeIndex > -1) {
-            nextIndex = isPrev ? currentNodeIndex - 1 : currentNodeIndex + 1;
+            if (element.tabIndex === 0) {
+                nextNode = isPrev ? items[i - 1] : items[i + 1];
+                break;
+            }
         }
 
-        const nextNode = available[nextIndex];
-
         if (nextNode) {
-            onFocusChange(nextNode.id);
-            const item = rootEl.current.querySelector(`[data-id="treeitem-${nextNode.id}"]`);
+            // @todo this won't work correctly with ids that are plain old numbers
+            const id = nextNode.dataset.id.replace('treeitem-', '');
 
-            item.focus();
-            item.firstElementChild.scrollIntoView({ block: 'center' });
+            onFocusChange(id);
+
+            nextNode.focus();
+            nextNode.firstElementChild.scrollIntoView({ block: 'center' });
         }
     };
 
