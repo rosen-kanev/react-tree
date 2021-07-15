@@ -20,12 +20,12 @@ const TreeItem = (props) => {
         >
             {isFn(renderLabel) ? (
                 renderLabel({
+                    ...props,
                     isExpanded,
                     isExpandable,
                     toggleItem() {
                         onItemSelect(props.id, isExpandable);
                     },
-                    ...props,
                 })
             ) : (
                 <div onClick={() => onItemSelect(props.id, isExpandable)}>{props.label}</div>
