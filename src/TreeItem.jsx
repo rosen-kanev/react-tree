@@ -16,6 +16,7 @@ const TreeItem = (props) => {
             aria-expanded={isExpanded}
             aria-selected={selected === props.id ? true : null}
             data-id={`treeitem-${props.id}`}
+            data-id-type={typeof props.id}
         >
             {isFn(renderLabel) ? (
                 renderLabel({

@@ -29,10 +29,10 @@ function Tree({ nodes, selected, focused, onFocusChange, expanded, onExpandChang
         }
 
         if (nextNode) {
-            // @todo this won't work correctly with ids that are plain old numbers
             const id = nextNode.dataset.id.replace('treeitem-', '');
+            const type = nextNode.dataset.idType;
 
-            onFocusChange(id);
+            onFocusChange(type === 'number' ? Number(id) : id);
 
             nextNode.focus();
             nextNode.firstElementChild.scrollIntoView({ block: 'center' });
@@ -106,10 +106,10 @@ function Tree({ nodes, selected, focused, onFocusChange, expanded, onExpandChang
             item.focus();
             item.firstElementChild.scrollIntoView({ block: 'center' });
 
-            // @todo this won't work correctly with ids that are plain old numbers
             const id = item.dataset.id.replace('treeitem-', '');
+            const type = item.dataset.idType;
 
-            onFocusChange(id);
+            onFocusChange(type === 'number' ? Number(id) : id);
         }
     };
 
