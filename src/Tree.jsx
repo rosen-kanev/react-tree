@@ -2,17 +2,52 @@ import React, { useRef, createContext } from 'react';
 
 import TreeItem from './TreeItem';
 import TreeContext from './TreeContext';
+import useInternalState from './useInternalState';
 
-function Tree({ nodes, selected, focused, onFocusChange, expanded, onExpandChange, onSelect, renderLabel, ...rest }) {
+const noop = () => {};
+
+function Tree({
+    nodes,
+
+    defaultFocused,
+    focused: focusedProp,
+    onFocusChange = noop,
+
+    defaultExpanded = [],
+    expanded: expandedProp,
+    onExpandChange = noop,
+
+    defaultSelected,
+    selected: selectedProp,
+    onSelect = noop,
+
+    renderLabel,
+    ...rest
+}) {
     const rootEl = useRef(null);
+    const [focused, setFocused] = useInternalState({
+        defaultValue: typeof defaultFocused === 'undefined' && nodes.length > 0 ? nodes[0].id : undefined,
+        value: focusedProp,
+        onChange: onFocusChange,
+    });
+    const [expanded, setExpanded] = useInternalState({
+        defaultValue: defaultExpanded,
+        value: expandedProp,
+        onChange: onExpandChange,
+    });
+    const [selected, setSelected] = useInternalState({
+        defaultValue: defaultSelected,
+        value: selectedProp,
+        onChange: onSelect,
+    });
 
     const onItemSelect = (id, isExpandable) => {
         if (isExpandable) {
-            onExpandChange(expanded.includes(id) ? expanded.filter((node) => node !== id) : expanded.concat(id));
+            setExpanded(expanded.includes(id) ? expanded.filter((node) => node !== id) : expanded.concat(id));
         }
 
-        onFocusChange(id);
-        onSelect(id);
+        setFocused(id);
+        setSelected(id);
     };
 
     const moveToTreeItem = (isPrev) => {
@@ -32,7 +67,7 @@ function Tree({ nodes, selected, focused, onFocusChange, expanded, onExpandChang
             const id = nextNode.dataset.id.replace('treeitem-', '');
             const type = nextNode.dataset.idType;
 
-            onFocusChange(type === 'number' ? Number(id) : id);
+            setFocused(type === 'number' ? Number(id) : id);
 
             nextNode.focus();
             nextNode.firstElementChild.scrollIntoView({ block: 'center' });
@@ -61,7 +96,7 @@ function Tree({ nodes, selected, focused, onFocusChange, expanded, onExpandChang
 
             if (isExpandable && isExpanded) {
                 // close node
-                onExpandChange(expanded.filter((node) => node !== focused));
+                setExpanded(expanded.filter((node) => node !== focused));
             } else {
                 // move focus to parent node
                 focusItem(treeItem.closest('[role="treeitem"]:not([tabindex="0"])'));
@@ -77,7 +112,7 @@ function Tree({ nodes, selected, focused, onFocusChange, expanded, onExpandChang
                     focusItem(treeItem.querySelector('[role="treeitem"]'));
                 } else {
                     // open node
-                    onExpandChange(expanded.concat(focused));
+                    setExpanded(expanded.concat(focused));
                 }
             }
         } else if (e.key === 'Enter' || e.key === ' ') {
@@ -109,7 +144,7 @@ function Tree({ nodes, selected, focused, onFocusChange, expanded, onExpandChang
             const id = item.dataset.id.replace('treeitem-', '');
             const type = item.dataset.idType;
 
-            onFocusChange(type === 'number' ? Number(id) : id);
+            setFocused(type === 'number' ? Number(id) : id);
         }
     };
 
