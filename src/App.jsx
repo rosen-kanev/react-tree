@@ -6,7 +6,6 @@ import Tree from './Tree';
 
 const App = () => {
     const [nodes, setNodes] = useState(data);
-    const [value, setValue] = useState('');
     const [expanded, setExpanded] = useState([]);
     const [focused, setFocused] = useState(data[0].id);
     const [selected, setSelected] = useState(null);

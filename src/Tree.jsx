@@ -1,4 +1,4 @@
-import React, { useRef, createContext } from 'react';
+import React, { useRef, createContext, memo } from 'react';
 
 import TreeItem from './TreeItem';
 import TreeContext from './TreeContext';
@@ -159,4 +159,4 @@ function Tree({
     );
 }
 
-export default Tree;
+export default memo(Tree);
