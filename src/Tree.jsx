@@ -150,7 +150,7 @@ function Tree({
 
     return (
         <TreeContext.Provider value={{ selected, focused, expanded, onItemSelect, renderLabel }}>
-            <ul ref={rootEl} role="tree" {...rest} onKeyDown={onKeyDown}>
+            <ul role="tree" onKeyDown={onKeyDown} {...rest} ref={rootEl}>
                 {nodes.map((node) => (
                     <TreeItem {...node} key={node.id} />
                 ))}
