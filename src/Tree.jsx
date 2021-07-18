@@ -213,7 +213,6 @@ if (process.env.NODE_ENV !== 'production') {
         onFocusChange: PropTypes.func,
 
         defaultExpanded: PropTypes.arrayOf(PropTypes.string),
-        // expanded: PropTypes.arrayOf(PropTypes.string),
         expanded: (props, name, componentName, location) => {
             const value = props[name];
             const comp = `\`<${componentName}>\``;
