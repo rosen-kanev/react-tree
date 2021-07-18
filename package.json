@@ -10,7 +10,8 @@
     "prepare": "husky install"
   },
   "files": [
-    "dist"
+    "dist",
+    "index.d.ts"
   ],
   "main": "./dist/react-tree.umd.js",
   "module": "./dist/react-tree.esm.js",
@@ -20,6 +21,7 @@
       "require": "./dist/react-tree.umd.js"
     }
   },
+  "typings": "./index.d.ts",
   "devDependencies": {
     "@babel/core": "7.14.6",
     "@babel/preset-env": "7.14.7",
