@@ -29,7 +29,7 @@ const App = () => {
                 expanded={expanded}
                 onExpandChange={setExpanded}
                 selected={selected}
-                onSelect={setSelected}
+                onSelectChange={setSelected}
                 renderLabel={renderLabel}
             />
         </div>

@@ -1,17 +1,17 @@
-import React, { useRef, createContext, memo } from 'react';
+import React, { useRef, memo } from 'react';
 
-import TreeItem from './TreeItem';
-import TreeContext from './TreeContext';
-import useInternalState from './useInternalState';
+import TreeItem from './TreeItem.jsx';
+import TreeContext from './TreeContext.js';
+import useInternalState from './useInternalState.js';
 
 const noop = () => {};
 
-function Tree({
+const Tree = ({
     nodes,
 
     defaultFocused,
     focused: focusedProp,
-    onFocusChange = noop,
+    onFocusChange,
 
     defaultExpanded = [],
     expanded: expandedProp,
@@ -19,26 +19,26 @@ function Tree({
 
     defaultSelected,
     selected: selectedProp,
-    onSelect = noop,
+    onSelectChange = noop,
 
     renderLabel,
     ...rest
-}) {
+}) => {
     const rootEl = useRef(null);
     const [focused, setFocused] = useInternalState({
         defaultValue: typeof defaultFocused === 'undefined' && nodes.length > 0 ? nodes[0].id : undefined,
         value: focusedProp,
-        onChange: onFocusChange,
+        onChange: typeof onFocusChange === 'function' ? onFocusChange : noop,
     });
     const [expanded, setExpanded] = useInternalState({
         defaultValue: defaultExpanded,
         value: expandedProp,
-        onChange: onExpandChange,
+        onChange: typeof onExpandChange === 'function' ? onExpandChange : noop,
     });
     const [selected, setSelected] = useInternalState({
         defaultValue: defaultSelected,
         value: selectedProp,
-        onChange: onSelect,
+        onChange: typeof onSelectChange === 'function' ? onSelectChange : noop,
     });
 
     const onItemSelect = (id, isExpandable) => {
@@ -65,9 +65,8 @@ function Tree({
 
         if (nextNode) {
             const id = nextNode.dataset.id.replace('treeitem-', '');
-            const type = nextNode.dataset.idType;
 
-            setFocused(type === 'number' ? Number(id) : id);
+            setFocused(id);
 
             nextNode.focus();
             nextNode.firstElementChild.scrollIntoView({ block: 'center' });
@@ -142,9 +141,8 @@ function Tree({
             item.firstElementChild.scrollIntoView({ block: 'center' });
 
             const id = item.dataset.id.replace('treeitem-', '');
-            const type = item.dataset.idType;
 
-            setFocused(type === 'number' ? Number(id) : id);
+            setFocused(id);
         }
     };
 
@@ -157,6 +155,6 @@ function Tree({
             </ul>
         </TreeContext.Provider>
     );
-}
+};
 
 export default memo(Tree);
