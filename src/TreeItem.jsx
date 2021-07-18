@@ -41,4 +41,8 @@ const TreeItem = (props) => {
     );
 };
 
+if (process.env.NODE_ENV !== 'production') {
+    TreeItem.displayName = 'TreeItem';
+}
+
 export default TreeItem;
