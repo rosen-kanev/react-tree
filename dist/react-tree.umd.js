@@ -27,86 +27,67 @@
     return _extends.apply(this, arguments);
   }
 
-  function _objectWithoutPropertiesLoose(source, excluded) {
-    if (source == null) return {};
-    var target = {};
-    var sourceKeys = Object.keys(source);
-    var key, i;
-
-    for (i = 0; i < sourceKeys.length; i++) {
-      key = sourceKeys[i];
-      if (excluded.indexOf(key) >= 0) continue;
-      target[key] = source[key];
-    }
-
-    return target;
-  }
-
-  var TreeContext = /*#__PURE__*/React.createContext({
+  const TreeContext = /*#__PURE__*/React.createContext({
     selected: null,
     focused: null,
     expanded: [],
-    onItemSelect: function onItemSelect() {},
-    renderLabel: function renderLabel() {}
+
+    onItemSelect() {},
+
+    renderLabel() {}
+
   });
   TreeContext.displayName = 'TreeContext';
 
-  var isFn = function isFn(value) {
-    return typeof value === 'function';
-  };
+  const isFn = value => typeof value === 'function';
 
-  var TreeItem = function TreeItem(props) {
-    var _useContext = React.useContext(TreeContext),
-        selected = _useContext.selected,
-        focused = _useContext.focused,
-        expanded = _useContext.expanded,
-        onItemSelect = _useContext.onItemSelect,
-        renderLabel = _useContext.renderLabel;
-
-    var isExpandable = props.nodes.length > 0;
-    var isExpanded = isExpandable ? expanded.includes(props.id) : null;
+  const TreeItem = props => {
+    const {
+      selected,
+      focused,
+      expanded,
+      onItemSelect,
+      renderLabel
+    } = React.useContext(TreeContext);
+    const isExpandable = props.nodes.length > 0;
+    const isExpanded = isExpandable ? expanded.includes(props.id) : null;
     return /*#__PURE__*/React__default['default'].createElement("li", {
       role: "treeitem",
       tabIndex: focused === props.id ? 0 : -1,
       "aria-expanded": isExpanded,
       "aria-selected": selected === props.id ? true : null,
-      "data-id": "treeitem-" + props.id
-    }, isFn(renderLabel) ? renderLabel(_extends({}, props, {
-      isExpanded: isExpanded,
-      isExpandable: isExpandable,
-      toggleItem: function toggleItem() {
+      "data-id": `treeitem-${props.id}`
+    }, isFn(renderLabel) ? renderLabel({ ...props,
+      isExpanded,
+      isExpandable,
+
+      toggleItem() {
         onItemSelect(props.id, isExpandable);
       }
-    })) : /*#__PURE__*/React__default['default'].createElement("div", {
-      onClick: function onClick() {
-        return onItemSelect(props.id, isExpandable);
-      }
+
+    }) : /*#__PURE__*/React__default['default'].createElement("div", {
+      onClick: () => onItemSelect(props.id, isExpandable)
     }, props.label), isExpanded && isExpandable && /*#__PURE__*/React__default['default'].createElement("ul", {
       role: "group"
-    }, props.nodes.map(function (node) {
-      return /*#__PURE__*/React__default['default'].createElement(TreeItem, _extends({}, node, {
-        key: node.id
-      }));
-    })));
+    }, props.nodes.map(node => /*#__PURE__*/React__default['default'].createElement(TreeItem, _extends({}, node, {
+      key: node.id
+    })))));
   };
 
   {
     TreeItem.displayName = 'TreeItem';
   }
 
-  var useInternalState = function useInternalState(_ref) {
-    var valueProp = _ref.value,
-        defaultValue = _ref.defaultValue,
-        onChange = _ref.onChange;
-
-    var _useState = React.useState(defaultValue),
-        valueState = _useState[0],
-        setValueState = _useState[1];
-
-    var isUncontrolled = typeof valueProp === 'undefined';
-    var value = isUncontrolled ? valueState : valueProp;
-    var updateValue = React.useCallback(function (updater) {
-      var nextValue = typeof updater === 'function' ? updater(value) : updater;
+  const useInternalState = ({
+    value: valueProp,
+    defaultValue,
+    onChange
+  }) => {
+    const [valueState, setValueState] = React.useState(defaultValue);
+    const isUncontrolled = typeof valueProp === 'undefined';
+    const value = isUncontrolled ? valueState : valueProp;
+    const updateValue = React.useCallback(updater => {
+      const nextValue = typeof updater === 'function' ? updater(value) : updater;
 
       if (isUncontrolled) {
         setValueState(nextValue);
@@ -117,70 +98,54 @@
     return [value, updateValue];
   };
 
-  var _excluded = ["nodes", "defaultFocused", "focused", "onFocusChange", "defaultExpanded", "expanded", "onExpandChange", "defaultSelected", "selected", "onSelectChange", "renderLabel"];
+  const noop = () => {};
 
-  var noop = function noop() {};
-
-  var Tree = function Tree(_ref) {
-    var nodes = _ref.nodes,
-        defaultFocused = _ref.defaultFocused,
-        focusedProp = _ref.focused,
-        onFocusChange = _ref.onFocusChange,
-        _ref$defaultExpanded = _ref.defaultExpanded,
-        defaultExpanded = _ref$defaultExpanded === void 0 ? [] : _ref$defaultExpanded,
-        expandedProp = _ref.expanded,
-        _ref$onExpandChange = _ref.onExpandChange,
-        onExpandChange = _ref$onExpandChange === void 0 ? noop : _ref$onExpandChange,
-        defaultSelected = _ref.defaultSelected,
-        selectedProp = _ref.selected,
-        _ref$onSelectChange = _ref.onSelectChange,
-        onSelectChange = _ref$onSelectChange === void 0 ? noop : _ref$onSelectChange,
-        renderLabel = _ref.renderLabel,
-        rest = _objectWithoutPropertiesLoose(_ref, _excluded);
-
-    var rootEl = React.useRef(null);
-
-    var _useInternalState = useInternalState({
+  const Tree = ({
+    nodes,
+    defaultFocused,
+    focused: focusedProp,
+    onFocusChange,
+    defaultExpanded = [],
+    expanded: expandedProp,
+    onExpandChange = noop,
+    defaultSelected,
+    selected: selectedProp,
+    onSelectChange = noop,
+    renderLabel,
+    ...rest
+  }) => {
+    const rootEl = React.useRef(null);
+    const [focused, setFocused] = useInternalState({
       defaultValue: typeof defaultFocused === 'undefined' && nodes.length > 0 ? nodes[0].id : undefined,
       value: focusedProp,
       onChange: typeof onFocusChange === 'function' ? onFocusChange : noop
-    }),
-        focused = _useInternalState[0],
-        setFocused = _useInternalState[1];
-
-    var _useInternalState2 = useInternalState({
+    });
+    const [expanded, setExpanded] = useInternalState({
       defaultValue: defaultExpanded,
       value: expandedProp,
       onChange: typeof onExpandChange === 'function' ? onExpandChange : noop
-    }),
-        expanded = _useInternalState2[0],
-        setExpanded = _useInternalState2[1];
-
-    var _useInternalState3 = useInternalState({
+    });
+    const [selected, setSelected] = useInternalState({
       defaultValue: defaultSelected,
       value: selectedProp,
       onChange: typeof onSelectChange === 'function' ? onSelectChange : noop
-    }),
-        selected = _useInternalState3[0],
-        setSelected = _useInternalState3[1];
+    });
 
-    var onItemSelect = function onItemSelect(id, isExpandable) {
+    const onItemSelect = (id, isExpandable) => {
       if (isExpandable) {
-        setExpanded(expanded.includes(id) ? expanded.filter(function (node) {
-          return node !== id;
-        }) : expanded.concat(id));
+        setExpanded(expanded.includes(id) ? expanded.filter(node => node !== id) : expanded.concat(id));
       }
 
       setFocused(id);
       setSelected(id);
     };
 
-    var moveToTreeItem = function moveToTreeItem(isPrev) {
-      var items = rootEl.current.querySelectorAll('[role="treeitem"]');
-      var nextNode;
+    const moveToTreeItem = isPrev => {
+      const items = rootEl.current.querySelectorAll('[role="treeitem"]');
+      let nextNode;
 
-      for (var i = 0; i < items.length; i++) {
-        var element = items[i];
+      for (let i = 0; i < items.length; i++) {
+        const element = items[i];
 
         if (element.tabIndex === 0) {
           nextNode = isPrev ? items[i - 1] : items[i + 1];
@@ -189,7 +154,7 @@
       }
 
       if (nextNode) {
-        var id = nextNode.dataset.id.replace('treeitem-', '');
+        const id = nextNode.dataset.id.replace('treeitem-', '');
         setFocused(id);
         nextNode.focus();
         nextNode.firstElementChild.scrollIntoView({
@@ -198,7 +163,7 @@
       }
     };
 
-    var onKeyDown = function onKeyDown(e) {
+    const onKeyDown = e => {
       if (!nodes.length || e.altKey || e.ctrlKey || e.metaKey) {
         return;
       }
@@ -213,33 +178,31 @@
         moveToTreeItem(false);
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
-
-        var _getTreeItem = getTreeItem(focused),
-            treeItem = _getTreeItem.treeItem,
-            isExpandable = _getTreeItem.isExpandable,
-            isExpanded = _getTreeItem.isExpanded;
+        const {
+          treeItem,
+          isExpandable,
+          isExpanded
+        } = getTreeItem(focused);
 
         if (isExpandable && isExpanded) {
           // close node
-          setExpanded(expanded.filter(function (node) {
-            return node !== focused;
-          }));
+          setExpanded(expanded.filter(node => node !== focused));
         } else {
           // move focus to parent node
           focusItem(treeItem.closest('[role="treeitem"]:not([tabindex="0"])'));
         }
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
+        const {
+          treeItem,
+          isExpandable,
+          isExpanded
+        } = getTreeItem(focused);
 
-        var _getTreeItem2 = getTreeItem(focused),
-            _treeItem = _getTreeItem2.treeItem,
-            _isExpandable = _getTreeItem2.isExpandable,
-            _isExpanded = _getTreeItem2.isExpanded;
-
-        if (_isExpandable) {
-          if (_isExpanded) {
+        if (isExpandable) {
+          if (isExpanded) {
             // move focus to next child node
-            focusItem(_treeItem.querySelector('[role="treeitem"]'));
+            focusItem(treeItem.querySelector('[role="treeitem"]'));
           } else {
             // open node
             setExpanded(expanded.concat(focused));
@@ -247,67 +210,63 @@
         }
       } else if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-
-        var _isExpandable2 = rootEl.current.querySelector("[data-id=\"treeitem-" + focused + "\"]").hasAttribute('aria-expanded');
-
-        onItemSelect(focused, _isExpandable2);
+        const isExpandable = rootEl.current.querySelector(`[data-id="treeitem-${focused}"]`).hasAttribute('aria-expanded');
+        onItemSelect(focused, isExpandable);
       }
     };
 
-    var getTreeItem = function getTreeItem(id) {
-      var treeItem = rootEl.current.querySelector("[data-id=\"treeitem-" + id + "\"]");
+    const getTreeItem = id => {
+      const treeItem = rootEl.current.querySelector(`[data-id="treeitem-${id}"]`);
       return {
-        treeItem: treeItem,
+        treeItem,
         isExpandable: treeItem.hasAttribute('aria-expanded'),
         isExpanded: treeItem.getAttribute('aria-expanded') === 'true'
       };
     };
 
-    var focusItem = function focusItem(item) {
+    const focusItem = item => {
       if (item) {
         item.focus();
         item.firstElementChild.scrollIntoView({
           block: 'center'
         });
-        var id = item.dataset.id.replace('treeitem-', '');
+        const id = item.dataset.id.replace('treeitem-', '');
         setFocused(id);
       }
     };
 
     return /*#__PURE__*/React__default['default'].createElement(TreeContext.Provider, {
       value: {
-        selected: selected,
-        focused: focused,
-        expanded: expanded,
-        onItemSelect: onItemSelect,
-        renderLabel: renderLabel
+        selected,
+        focused,
+        expanded,
+        onItemSelect,
+        renderLabel
       }
     }, /*#__PURE__*/React__default['default'].createElement("ul", _extends({
       role: "tree",
       onKeyDown: onKeyDown
     }, rest, {
       ref: rootEl
-    }), nodes.map(function (node) {
-      return /*#__PURE__*/React__default['default'].createElement(TreeItem, _extends({}, node, {
-        key: node.id
-      }));
-    })));
+    }), nodes.map(node => /*#__PURE__*/React__default['default'].createElement(TreeItem, _extends({}, node, {
+      key: node.id
+    })))));
   };
 
   {
-    var getErrorForControlled = function getErrorForControlled(propName, componentName, handlerName, defaultPropName) {
-      return "You provided a `" + propName + "` prop to " + componentName + " without an `" + handlerName + "` handler. " + ("This will cause the " + componentName + " component to behave incorrectly. ") + ("If the " + componentName + " should be mutable use `" + defaultPropName + "` instead. Otherwise, set `" + handlerName + "`.");
+    const getErrorForControlled = (propName, componentName, handlerName, defaultPropName) => {
+      return `You provided a \`${propName}\` prop to ${componentName} without an \`${handlerName}\` handler. ` + `This will cause the ${componentName} component to behave incorrectly. ` + `If the ${componentName} should be mutable use \`${defaultPropName}\` instead. Otherwise, set \`${handlerName}\`.`;
     };
 
-    var getErrorForUncontrolled = function getErrorForUncontrolled(propName, componentName, handlerName, defaultPropName) {
-      return "You provided a `" + propName + "` prop as well as a `" + defaultPropName + "` prop to " + componentName + ". " + ("If you want a controlled component, use the `" + propName + "` prop with an `" + handlerName + "` handler. ") + ("If you want an uncontrolled component, remove the `" + propName + "` prop and use `" + defaultPropName + "` instead.");
+    const getErrorForUncontrolled = (propName, componentName, handlerName, defaultPropName) => {
+      return `You provided a \`${propName}\` prop as well as a \`${defaultPropName}\` prop to ${componentName}. ` + `If you want a controlled component, use the \`${propName}\` prop with an \`${handlerName}\` handler. ` + `If you want an uncontrolled component, remove the \`${propName}\` prop and use \`${defaultPropName}\` instead.`;
     };
 
-    var getGenericTypeError = function getGenericTypeError(name, componentName, expectedType, value) {
-      return "Invalid prop `" + name + "` supplied to " + componentName + ". Expected `" + expectedType + "`, received `" + (Array.isArray(value) ? 'array' : typeof value) + "`.";
+    const getGenericTypeError = (name, componentName, expectedType, value) => {
+      return `Invalid prop \`${name}\` supplied to ${componentName}. Expected \`${expectedType}\`, received \`${Array.isArray(value) ? 'array' : typeof value}\`.`;
     };
 
-    var nodeShape = {
+    let nodeShape = {
       id: PropTypes__default['default'].string.isRequired,
       label: PropTypes__default['default'].oneOfType([PropTypes__default['default'].string, PropTypes__default['default'].node]).isRequired
     };
@@ -316,9 +275,9 @@
     Tree.propTypes = {
       nodes: PropTypes__default['default'].arrayOf(PropTypes__default['default'].shape(nodeShape)).isRequired,
       defaultFocused: PropTypes__default['default'].string,
-      focused: function focused(props, name, componentName, location) {
-        var value = props[name];
-        var comp = "`<" + componentName + ">`";
+      focused: (props, name, componentName, location) => {
+        const value = props[name];
+        const comp = `\`<${componentName}>\``;
 
         if (typeof value === 'string' && props.onFocusChange == null) {
           return new Error(getErrorForControlled(name, comp, 'onFocusChange', 'defaultFocused'));
@@ -337,9 +296,9 @@
       onFocusChange: PropTypes__default['default'].func,
       defaultExpanded: PropTypes__default['default'].arrayOf(PropTypes__default['default'].string),
       // expanded: PropTypes.arrayOf(PropTypes.string),
-      expanded: function expanded(props, name, componentName, location) {
-        var value = props[name];
-        var comp = "`<" + componentName + ">`";
+      expanded: (props, name, componentName, location) => {
+        const value = props[name];
+        const comp = `\`<${componentName}>\``;
 
         if (Array.isArray(value) && props.onExpandChange == null) {
           return new Error(getErrorForControlled(name, comp, 'onExpandChange', 'defaultExpanded'));
@@ -350,10 +309,8 @@
         }
 
         if (Array.isArray(value)) {
-          var message = "You provided an array as an index in " + comp + " but one or more of the values are not string.";
-          return value.some(function (i) {
-            return typeof i !== 'string';
-          }) ? new Error(message) : null;
+          const message = `You provided an array as an index in ${comp} but one or more of the values are not string.`;
+          return value.some(i => typeof i !== 'string') ? new Error(message) : null;
         }
 
         if (value != null && !Array.isArray(value)) {
@@ -364,9 +321,9 @@
       },
       onExpandChange: PropTypes__default['default'].func,
       defaultSelected: PropTypes__default['default'].string,
-      selected: function selected(props, name, componentName, location) {
-        var value = props[name];
-        var comp = "`<" + componentName + ">`";
+      selected: (props, name, componentName, location) => {
+        const value = props[name];
+        const comp = `\`<${componentName}>\``;
 
         if (typeof value === 'string' && props.onSelectChange == null) {
           return new Error(getErrorForControlled(name, comp, 'onSelectChange', 'defaultSelected'));
