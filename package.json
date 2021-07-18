@@ -22,6 +22,9 @@
     }
   },
   "typings": "./index.d.ts",
+  "dependencies": {
+    "prop-types": "^15.7.2"
+  },
   "devDependencies": {
     "@babel/core": "7.14.6",
     "@babel/preset-env": "7.14.7",
@@ -51,10 +54,8 @@
     "react tree component",
     "react component"
   ],
+  "sideEffects": false,
   "author": "Rosen Kanev <rosen.kanev@mentormate.com>",
   "homepage": "https://github.com/rosen-kanev/react-tree#readme",
-  "repository": "git@github.com:rosen-kanev/react-tree.git",
-  "dependencies": {
-    "prop-types": "^15.7.2"
-  }
+  "repository": "git@github.com:rosen-kanev/react-tree.git"
 }
