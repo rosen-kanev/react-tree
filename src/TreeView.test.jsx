@@ -19,9 +19,27 @@ beforeEach(() => {
     };
 });
 
-it('should render a single item', () => {
-    const { queryByRole } = render(<Tree nodes={[basicTreeItem]} />);
-    const treeitem = queryByRole('treeitem');
+describe('a11y', () => {
+    it('should render a single tree item with a simple string label', () => {
+        const { queryByRole } = render(<Tree nodes={[basicTreeItem]} />);
+        const treeitem = queryByRole('treeitem');
 
-    expect(treeitem).toHaveTextContent(basicTreeItem.label);
+        expect(treeitem).toHaveTextContent(basicTreeItem.label);
+    });
+
+    it('should render a shallow tree', () => {
+        const { queryAllByRole } = render(<Tree nodes={shallowTreeData} />);
+        const treeitems = queryAllByRole('treeitem');
+
+        expect(treeitems).toHaveLength(11);
+    });
+
+    it('should render a nested tree', () => {
+        const { queryAllByRole } = render(
+            <Tree nodes={fullTreeData} defaultExpanded={['1', '2', '3', '4', '9', '10', '25', '30', '42']} />
+        );
+        const treeitems = queryAllByRole('treeitem');
+
+        expect(treeitems).toHaveLength(59);
+    });
 });
