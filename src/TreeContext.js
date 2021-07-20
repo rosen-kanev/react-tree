@@ -8,6 +8,8 @@ const TreeContext = createContext({
     renderLabel() {},
 });
 
-TreeContext.displayName = 'TreeContext';
+if (process.env.NODE_ENV !== 'production') {
+    TreeContext.displayName = 'TreeContext';
+}
 
 export default TreeContext;
