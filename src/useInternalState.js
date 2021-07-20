@@ -6,9 +6,7 @@ const useInternalState = ({ value: valueProp, defaultValue, onChange }) => {
     const value = isUncontrolled ? valueState : valueProp;
 
     const updateValue = useCallback(
-        (updater) => {
-            const nextValue = typeof updater === 'function' ? updater(value) : updater;
-
+        (nextValue) => {
             if (isUncontrolled) {
                 setValueState(nextValue);
             }
