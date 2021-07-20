@@ -16,18 +16,23 @@ const Tree = ({
 
     defaultExpanded = [],
     expanded: expandedProp,
-    onExpandChange = noop,
+    onExpandChange,
 
     defaultSelected,
     selected: selectedProp,
-    onSelectChange = noop,
+    onSelectChange,
 
     renderLabel,
     ...rest
 }) => {
     const rootEl = useRef(null);
     const [focused, setFocused] = useInternalState({
-        defaultValue: typeof defaultFocused === 'undefined' && nodes.length > 0 ? nodes[0].id : undefined,
+        defaultValue:
+            typeof focusedProp === 'undefined'
+                ? typeof defaultFocused === 'undefined' && nodes.length > 0
+                    ? nodes[0].id
+                    : defaultFocused
+                : undefined,
         value: focusedProp,
         onChange: typeof onFocusChange === 'function' ? onFocusChange : noop,
     });
@@ -75,6 +80,7 @@ const Tree = ({
     };
 
     const onKeyDown = (e) => {
+        /* istanbul ignore next we test this, but the code coverage tool is still unconvinced */
         if (!nodes.length || e.altKey || e.ctrlKey || e.metaKey) {
             return;
         }
@@ -158,6 +164,7 @@ const Tree = ({
     );
 };
 
+/* istanbul ignore next */
 if (process.env.NODE_ENV !== 'production') {
     const getErrorForControlled = (propName, componentName, handlerName, defaultPropName) => {
         return (

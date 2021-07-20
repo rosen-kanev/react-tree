@@ -41,6 +41,7 @@ const TreeItem = (props) => {
     );
 };
 
+/* istanbul ignore next */
 if (process.env.NODE_ENV !== 'production') {
     TreeItem.displayName = 'TreeItem';
 }
