@@ -7,6 +7,11 @@ import useInternalState from './useInternalState.js';
 
 const noop = () => {};
 
+/**
+ * An accessible tree view component, based on the WAI-ARIA authoring practices for accessible widgets.
+ *
+ * @see WAI-ARIA https://www.w3.org/TR/wai-aria-practices-1.2/#TreeView
+ */
 const Tree = ({
     nodes,
 
