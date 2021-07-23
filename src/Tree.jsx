@@ -204,7 +204,7 @@ if (process.env.NODE_ENV !== 'production') {
         nodes: PropTypes.arrayOf(PropTypes.shape(nodeShape)).isRequired,
 
         defaultFocused: PropTypes.string,
-        focused: (props, name, componentName, location) => {
+        focused: (props, name, componentName) => {
             const value = props[name];
             const comp = `\`<${componentName}>\``;
 
@@ -225,7 +225,7 @@ if (process.env.NODE_ENV !== 'production') {
         onFocusChange: PropTypes.func,
 
         defaultExpanded: PropTypes.arrayOf(PropTypes.string),
-        expanded: (props, name, componentName, location) => {
+        expanded: (props, name, componentName) => {
             const value = props[name];
             const comp = `\`<${componentName}>\``;
 
