@@ -10,10 +10,17 @@ const App = () => {
     const [focused, setFocused] = useState(data[0].id);
     const [selected, setSelected] = useState(null);
 
-    const renderLabel = useCallback(({ isExpandable, isExpanded, label, toggleItem }) => {
+    const renderLabel = useCallback(({ isExpandable, label, toggleItem }) => {
         return (
             <div onClick={toggleItem}>
-                {isExpandable ? (isExpanded ? '↓ ' : '→ ') : '📄 '}
+                {isExpandable ? (
+                    <>
+                        <span className="arrow-down">{'↓ '}</span>
+                        <span className="arrow-right">{'→ '}</span>
+                    </>
+                ) : (
+                    '📄 '
+                )}
 
                 <span>{label}</span>
             </div>

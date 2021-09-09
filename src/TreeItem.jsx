@@ -1,26 +1,17 @@
-import React, { useContext } from 'react';
+import React, { memo } from 'react';
 
 import TreeContext from './TreeContext';
 
 const isFn = (value) => typeof value === 'function';
 
-const TreeItem = (props) => {
-    const { selected, focused, expanded, onItemSelect, renderLabel } = useContext(TreeContext);
+const TreeItem = ({ onItemSelect, renderLabel, ...props }) => {
     const isExpandable = props.nodes.length > 0;
-    const isExpanded = isExpandable ? expanded.includes(props.id) : null;
 
     return (
-        <li
-            role="treeitem"
-            tabIndex={focused === props.id ? 0 : -1}
-            aria-expanded={isExpanded}
-            aria-selected={selected === props.id ? true : null}
-            data-id={`treeitem-${props.id}`}
-        >
+        <li role="treeitem" tabIndex={-1} data-expandable={isExpandable ? '' : null} data-id={`treeitem-${props.id}`}>
             {isFn(renderLabel) ? (
                 renderLabel({
                     ...props,
-                    isExpanded,
                     isExpandable,
                     toggleItem() {
                         onItemSelect(props.id, isExpandable);
@@ -30,10 +21,10 @@ const TreeItem = (props) => {
                 <div onClick={() => onItemSelect(props.id, isExpandable)}>{props.label}</div>
             )}
 
-            {isExpanded && isExpandable && (
+            {isExpandable && (
                 <ul role="group">
                     {props.nodes.map((node) => (
-                        <TreeItem {...node} key={node.id} />
+                        <TreeItem {...node} onItemSelect={onItemSelect} renderLabel={renderLabel} key={node.id} />
                     ))}
                 </ul>
             )}
@@ -46,4 +37,4 @@ if (process.env.NODE_ENV !== 'production') {
     TreeItem.displayName = 'TreeItem';
 }
 
-export default TreeItem;
+export default memo(TreeItem);

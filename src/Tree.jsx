@@ -1,4 +1,4 @@
-import React, { useRef, memo } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 
 import TreeItem from './TreeItem.jsx';
@@ -52,14 +52,56 @@ const Tree = ({
         onChange: typeof onSelectChange === 'function' ? onSelectChange : noop,
     });
 
-    const onItemSelect = (id, isExpandable) => {
+    useEffect(() => {
+        const nodes = rootEl.current.querySelectorAll(`[data-expandable]`);
+
+        nodes.forEach((node) => {
+            const nodeId = node.dataset.id.replace('treeitem-', '');
+
+            if (expanded.includes(nodeId)) {
+                node.setAttribute('aria-expanded', 'true');
+            } else {
+                node.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }, [expanded]);
+
+    useEffect(() => {
+        // remove tabIndex from previous and add it to current
+        const node = rootEl.current.querySelector(`[data-id="treeitem-${focused}"]`);
+        const oldNode = rootEl.current.querySelector(`[tabindex="0"]`);
+
+        if (oldNode) {
+            oldNode.setAttribute('tabindex', '-1');
+        }
+
+        if (node) {
+            node.setAttribute('tabindex', '0');
+        }
+    }, [focused]);
+
+    useEffect(() => {
+        // remove aria-selected from previous and add it to current
+        const node = rootEl.current.querySelector(`[data-id="treeitem-${selected}"]`);
+        const oldNode = rootEl.current.querySelector(`[aria-selected="true"]`);
+
+        if (oldNode) {
+            oldNode.removeAttribute('aria-selected');
+        }
+
+        if (node) {
+            node.setAttribute('aria-selected', 'true');
+        }
+    }, [selected]);
+
+    const onItemSelect = useCallback((id, isExpandable) => {
         if (isExpandable) {
-            setExpanded(expanded.includes(id) ? expanded.filter((node) => node !== id) : expanded.concat(id));
+            setExpanded((prev) => (prev.includes(id) ? prev.filter((node) => node !== id) : prev.concat(id)));
         }
 
         setFocused(id);
         setSelected(id);
-    };
+    }, []);
 
     const moveToTreeItem = (isPrev) => {
         const items = rootEl.current.querySelectorAll('[role="treeitem"]');
@@ -159,13 +201,11 @@ const Tree = ({
     };
 
     return (
-        <TreeContext.Provider value={{ selected, focused, expanded, onItemSelect, renderLabel }}>
-            <ul role="tree" onKeyDown={onKeyDown} {...rest} ref={rootEl}>
-                {nodes.map((node) => (
-                    <TreeItem {...node} key={node.id} />
-                ))}
-            </ul>
-        </TreeContext.Provider>
+        <ul role="tree" onKeyDown={onKeyDown} {...rest} ref={rootEl}>
+            {nodes.map((node) => (
+                <TreeItem {...node} onItemSelect={onItemSelect} renderLabel={renderLabel} key={node.id} />
+            ))}
+        </ul>
     );
 };
 
@@ -276,4 +316,4 @@ if (process.env.NODE_ENV !== 'production') {
     };
 }
 
-export default memo(Tree);
+export default Tree;
