@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, screen } from '@testing-library/react';
 import cloneDeep from 'lodash.clonedeep';
 
 import data from './data';
@@ -83,7 +83,7 @@ describe('focus management', () => {
         element.focus();
         fireEvent.keyDown(document.activeElement, { key: 'ArrowDown' });
 
-        expect(setFocusedMock).toHaveBeenCalledWith(shallowTreeData[1].id);
+        expect(setFocusedMock).toHaveBeenCalledWith(shallowTreeData[1]);
     });
 
     test('uncontrolled component', () => {
@@ -102,17 +102,19 @@ describe('focus management', () => {
 });
 
 describe('expanded management', () => {
-    test('controlled component', () => {
+    test('controlled component', async () => {
         const node = fullTreeData[0];
         const setExpandedMock = jest.fn();
-        const { container } = render(<Tree nodes={fullTreeData} expanded={[]} onExpandChange={setExpandedMock} />);
+        const { container, findByRole } = render(
+            <Tree nodes={fullTreeData} expanded={[]} onExpandChange={setExpandedMock} />
+        );
 
         const element = container.querySelector('[tabindex="0"]');
 
         element.focus();
         fireEvent.keyDown(document.activeElement, { key: 'Enter' });
 
-        expect(setExpandedMock).toHaveBeenCalledWith([node.id]);
+        expect(setExpandedMock).toHaveBeenCalledWith(node);
     });
 
     test('uncontrolled component', () => {
@@ -139,7 +141,7 @@ describe('selected management', () => {
         fireEvent.keyDown(document.activeElement, { key: 'ArrowDown' });
         fireEvent.keyDown(document.activeElement, { key: 'Enter' });
 
-        expect(setSelectedMock).toHaveBeenCalledWith(shallowTreeData[1].id);
+        expect(setSelectedMock).toHaveBeenCalledWith(shallowTreeData[1]);
     });
 
     test('uncontrolled component', () => {

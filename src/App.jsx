@@ -10,21 +10,40 @@ const App = () => {
     const [focused, setFocused] = useState(data[0].id);
     const [selected, setSelected] = useState(null);
 
-    const renderLabel = useCallback(({ isExpandable, label, toggleItem }) => {
+    const renderLabel = useCallback(({ id, isExpandable, isExpanded, label, toggleItem }) => {
         return (
             <div onClick={toggleItem}>
-                {isExpandable ? (
-                    <>
-                        <span className="arrow-down">{'↓ '}</span>
-                        <span className="arrow-right">{'→ '}</span>
-                    </>
-                ) : (
-                    '📄 '
+                {isExpandable && (
+                    <span
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setExpanded((prev) =>
+                                prev.includes(id) ? prev.filter((node) => node !== id) : prev.concat(id)
+                            );
+                            setFocused(id);
+                        }}
+                    >
+                        {isExpanded ? '↓ ' : '→ '}
+                    </span>
                 )}
 
-                <span>{label}</span>
+                {!isExpandable && '📄 '}
+
+                {label}
             </div>
         );
+    }, []);
+
+    const onFocusChange = useCallback(({ id }) => {
+        setFocused(id);
+    }, []);
+
+    const onExpandChange = useCallback(({ id }) => {
+        setExpanded((prev) => (prev.includes(id) ? prev.filter((node) => node !== id) : prev.concat(id)));
+    }, []);
+
+    const onSelectChange = useCallback(({ id }) => {
+        setSelected(id);
     }, []);
 
     return (
@@ -32,12 +51,13 @@ const App = () => {
             <Tree
                 nodes={nodes}
                 focused={focused}
-                onFocusChange={setFocused}
+                onFocusChange={onFocusChange}
                 expanded={expanded}
-                onExpandChange={setExpanded}
+                onExpandChange={onExpandChange}
                 selected={selected}
-                onSelectChange={setSelected}
+                onSelectChange={onSelectChange}
                 renderLabel={renderLabel}
+                expandOnSelect={false}
             />
         </div>
     );

@@ -1,42 +1,106 @@
 'use strict';
 
-var react = require('react');
+var React = require('react');
 var PropTypes = require('prop-types');
 var jsxRuntime = require('react/jsx-runtime');
 
 function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
 
+var React__default = /*#__PURE__*/_interopDefaultLegacy(React);
 var PropTypes__default = /*#__PURE__*/_interopDefaultLegacy(PropTypes);
 
-const TreeContext = /*#__PURE__*/react.createContext({
-  selected: null,
-  focused: null,
-  expanded: [],
-
-  onItemSelect() {},
-
-  renderLabel() {}
-
-});
-TreeContext.displayName = 'TreeContext';
-
+const noop = () => {};
 const isFn = value => typeof value === 'function';
+const isUndefined = value => typeof value === 'undefined';
+const getNodeIds = nodes => {
+  const stack = [...nodes];
+  const result = [];
 
-const TreeItem = props => {
-  const {
-    selected,
-    focused,
-    expanded,
-    onItemSelect,
-    renderLabel
-  } = react.useContext(TreeContext);
+  while (stack.length) {
+    const node = stack.pop();
+    result.push(node.id);
+    stack.push(...node.nodes);
+  }
+
+  return result;
+};
+const findNode = (nodes, id) => {
+  const stack = [...nodes];
+
+  while (stack.length) {
+    const node = stack.pop();
+
+    if (node.id === id) {
+      return node;
+    }
+
+    stack.push(...node.nodes);
+  }
+
+  return null;
+}; // shallow equals check, but without `expanded` and `onItemSelect`
+
+const shallowEquals = (prev, next) => {
+  if (Object.is(prev, next)) {
+    return true;
+  }
+
+  const keysPrev = Object.keys(prev).filter(key => key !== 'expanded' && key !== 'onItemSelect');
+  const keysNext = Object.keys(next).filter(key => key !== 'expanded' && key !== 'onItemSelect');
+
+  if (keysPrev.length !== keysNext.length) {
+    return false;
+  }
+
+  for (const key of keysPrev) {
+    if (!Object.prototype.hasOwnProperty.call(next, key) || !Object.is(prev[key], next[key])) {
+      return false;
+    }
+  }
+
+  return true;
+};
+const propsAreEqual = (prev, next) => {
+  const id = next.id;
+  const areOtherPropsDifferent = !shallowEquals(prev, next);
+
+  if (areOtherPropsDifferent) {
+    return false;
+  }
+
+  if (prev.expanded.includes(id) !== next.expanded.includes(id)) {
+    return false;
+  } // We don't do a check if prev.expanded has children to update, because this node won't render any children.
+  // This way we can skip the checks for it and its children - they won't render either way...
+
+
+  if (next.expanded.includes(id)) {
+    // this node has children that may need updates
+    const children = getNodeIds(next.nodes);
+
+    for (const child of children) {
+      if (prev.expanded.includes(child) !== next.expanded.includes(child)) {
+        // a child node needs to be updated
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
+const TreeItem = ({
+  onItemSelect,
+  renderLabel,
+  expanded,
+  ...props
+}) => {
   const isExpandable = props.nodes.length > 0;
   const isExpanded = isExpandable ? expanded.includes(props.id) : null;
   return /*#__PURE__*/jsxRuntime.jsxs("li", {
     role: "treeitem",
-    tabIndex: focused === props.id ? 0 : -1,
+    tabIndex: -1,
     "aria-expanded": isExpanded,
-    "aria-selected": selected === props.id ? true : null,
     "data-id": `treeitem-${props.id}`,
     children: [isFn(renderLabel) ? renderLabel({ ...props,
       isExpanded,
@@ -51,44 +115,41 @@ const TreeItem = props => {
       children: props.label
     }), isExpanded && isExpandable && /*#__PURE__*/jsxRuntime.jsx("ul", {
       role: "group",
-      children: props.nodes.map(node => /*#__PURE__*/react.createElement(TreeItem, { ...node,
+      children: props.nodes.map(node => /*#__PURE__*/React.createElement(MemoTreeItem, { ...node,
+        expanded: expanded,
+        onItemSelect: onItemSelect,
+        renderLabel: renderLabel,
         key: node.id
       }))
     })]
   });
 };
+/* istanbul ignore next */
+
 
 if (process.env.NODE_ENV !== 'production') {
   TreeItem.displayName = 'TreeItem';
 }
 
-const useInternalState = ({
-  value: valueProp,
-  defaultValue,
-  onChange
-}) => {
-  const [valueState, setValueState] = react.useState(defaultValue);
-  const isUncontrolled = typeof valueProp === 'undefined';
+const MemoTreeItem = /*#__PURE__*/React__default['default'].memo(TreeItem, propsAreEqual);
+
+const useInternalState = (valueProp, defaultValue) => {
+  const [valueState, setValueState] = React.useState(defaultValue);
+  const isUncontrolled = isUndefined(valueProp);
   const value = isUncontrolled ? valueState : valueProp;
-  const updateValue = react.useCallback(updater => {
-    const nextValue = typeof updater === 'function' ? updater(value) : updater;
-
+  const updateValue = React.useCallback(next => {
     if (isUncontrolled) {
-      setValueState(nextValue);
+      setValueState(next);
     }
-
-    onChange(nextValue);
-  }, [isUncontrolled, onChange, value]);
+  }, [isUncontrolled, value]);
   return [value, updateValue];
 };
-
-const noop = () => {};
 
 const Tree = ({
   nodes,
   defaultFocused,
   focused: focusedProp,
-  onFocusChange,
+  onFocusChange = noop,
   defaultExpanded = [],
   expanded: expandedProp,
   onExpandChange = noop,
@@ -96,32 +157,59 @@ const Tree = ({
   selected: selectedProp,
   onSelectChange = noop,
   renderLabel,
+  expandOnSelect = true,
   ...rest
 }) => {
-  const rootEl = react.useRef(null);
-  const [focused, setFocused] = useInternalState({
-    defaultValue: typeof defaultFocused === 'undefined' && nodes.length > 0 ? nodes[0].id : undefined,
-    value: focusedProp,
-    onChange: typeof onFocusChange === 'function' ? onFocusChange : noop
-  });
-  const [expanded, setExpanded] = useInternalState({
-    defaultValue: defaultExpanded,
-    value: expandedProp,
-    onChange: typeof onExpandChange === 'function' ? onExpandChange : noop
-  });
-  const [selected, setSelected] = useInternalState({
-    defaultValue: defaultSelected,
-    value: selectedProp,
-    onChange: typeof onSelectChange === 'function' ? onSelectChange : noop
-  });
+  const rootEl = React.useRef(null);
+  const initialFocus = isUndefined(focusedProp) ? isUndefined(defaultFocused) && nodes.length > 0 ? nodes[0].id : defaultFocused : undefined;
+  const [focused, setFocused] = useInternalState(focusedProp, initialFocus);
+  const [expanded, setExpanded] = useInternalState(expandedProp, defaultExpanded);
+  const [selected, setSelected] = useInternalState(selectedProp, defaultSelected);
+  React.useEffect(() => {
+    // remove tabIndex from previous and add it to current
+    const node = rootEl.current.querySelector(`[data-id="treeitem-${focused}"]`);
+    const oldNode = rootEl.current.querySelector(`[tabindex="0"]`);
+
+    if (oldNode) {
+      oldNode.setAttribute('tabindex', '-1');
+    }
+    /* istanbul ignore next when nodes is empty it's okay not to have a focused element */
+
+
+    if (node) {
+      node.setAttribute('tabindex', '0');
+    }
+  }, [focused]);
+  React.useEffect(() => {
+    // remove aria-selected from previous and add it to current
+    const node = rootEl.current.querySelector(`[data-id="treeitem-${selected}"]`);
+    const oldNode = rootEl.current.querySelector(`[aria-selected="true"]`);
+
+    if (oldNode) {
+      oldNode.removeAttribute('aria-selected');
+    } // selected node is optional so we don't show a warning if no node is found
+
+
+    if (node) {
+      node.setAttribute('aria-selected', 'true');
+    }
+  }, [selected]); // This function is passed as a prop to <TreeItem />, but it has custom `memo(arePropsEqual)`
+  // which ignores object identity changes. If the `memo()` changes make sure to wrap this with `useCallback()`
 
   const onItemSelect = (id, isExpandable) => {
-    if (isExpandable) {
-      setExpanded(expanded.includes(id) ? expanded.filter(node => node !== id) : expanded.concat(id));
+    const node = findNode(nodes, id);
+
+    if (expandOnSelect && isExpandable) {
+      setExpanded(prev => {
+        return prev.includes(id) ? prev.filter(node => node !== id) : prev.concat(id);
+      });
+      onExpandChange(node);
     }
 
     setFocused(id);
+    onFocusChange(node);
     setSelected(id);
+    onSelectChange(node);
   };
 
   const moveToTreeItem = isPrev => {
@@ -139,7 +227,9 @@ const Tree = ({
 
     if (nextNode) {
       const id = nextNode.dataset.id.replace('treeitem-', '');
+      const node = findNode(nodes, id);
       setFocused(id);
+      onFocusChange(node);
       nextNode.focus();
       nextNode.firstElementChild.scrollIntoView({
         block: 'center'
@@ -148,6 +238,7 @@ const Tree = ({
   };
 
   const onKeyDown = e => {
+    /* istanbul ignore next we test this, but the code coverage tool is still unconvinced */
     if (!nodes.length || e.altKey || e.ctrlKey || e.metaKey) {
       return;
     }
@@ -170,7 +261,9 @@ const Tree = ({
 
       if (isExpandable && isExpanded) {
         // close node
-        setExpanded(expanded.filter(node => node !== focused));
+        const node = findNode(nodes, focused);
+        setExpanded(prev => prev.filter(node => node !== focused));
+        onExpandChange(node);
       } else {
         // move focus to parent node
         focusItem(treeItem.closest('[role="treeitem"]:not([tabindex="0"])'));
@@ -189,7 +282,9 @@ const Tree = ({
           focusItem(treeItem.querySelector('[role="treeitem"]'));
         } else {
           // open node
-          setExpanded(expanded.concat(focused));
+          const node = findNode(nodes, focused);
+          setExpanded(prev => prev.concat(focused));
+          onExpandChange(node);
         }
       }
     } else if (e.key === 'Enter' || e.key === ' ') {
@@ -215,29 +310,27 @@ const Tree = ({
         block: 'center'
       });
       const id = item.dataset.id.replace('treeitem-', '');
+      const node = findNode(nodes, id);
       setFocused(id);
+      onFocusChange(node);
     }
   };
 
-  return /*#__PURE__*/jsxRuntime.jsx(TreeContext.Provider, {
-    value: {
-      selected,
-      focused,
-      expanded,
-      onItemSelect,
-      renderLabel
-    },
-    children: /*#__PURE__*/jsxRuntime.jsx("ul", {
-      role: "tree",
-      onKeyDown: onKeyDown,
-      ...rest,
-      ref: rootEl,
-      children: nodes.map(node => /*#__PURE__*/react.createElement(TreeItem, { ...node,
-        key: node.id
-      }))
-    })
+  return /*#__PURE__*/jsxRuntime.jsx("ul", {
+    role: "tree",
+    onKeyDown: onKeyDown,
+    ...rest,
+    ref: rootEl,
+    children: nodes.map(node => /*#__PURE__*/React.createElement(MemoTreeItem, { ...node,
+      expanded: expanded,
+      onItemSelect: onItemSelect,
+      renderLabel: renderLabel,
+      key: node.id
+    }))
   });
 };
+/* istanbul ignore next */
+
 
 if (process.env.NODE_ENV !== 'production') {
   const getErrorForControlled = (propName, componentName, handlerName, defaultPropName) => {
@@ -261,7 +354,7 @@ if (process.env.NODE_ENV !== 'production') {
   Tree.propTypes = {
     nodes: PropTypes__default['default'].arrayOf(PropTypes__default['default'].shape(nodeShape)).isRequired,
     defaultFocused: PropTypes__default['default'].string,
-    focused: (props, name, componentName, location) => {
+    focused: (props, name, componentName) => {
       const value = props[name];
       const comp = `\`<${componentName}>\``;
 
@@ -281,8 +374,7 @@ if (process.env.NODE_ENV !== 'production') {
     },
     onFocusChange: PropTypes__default['default'].func,
     defaultExpanded: PropTypes__default['default'].arrayOf(PropTypes__default['default'].string),
-    // expanded: PropTypes.arrayOf(PropTypes.string),
-    expanded: (props, name, componentName, location) => {
+    expanded: (props, name, componentName) => {
       const value = props[name];
       const comp = `\`<${componentName}>\``;
 
@@ -295,7 +387,7 @@ if (process.env.NODE_ENV !== 'production') {
       }
 
       if (Array.isArray(value)) {
-        const message = `You provided an array as an index in ${comp} but one or more of the values are not string.`;
+        const message = `You provided an array as \`${name}\` in ${comp} but one or more of the values are not string.`;
         return value.some(i => typeof i !== 'string') ? new Error(message) : null;
       }
 
@@ -330,6 +422,6 @@ if (process.env.NODE_ENV !== 'production') {
   };
 }
 
-var Tree$1 = /*#__PURE__*/react.memo(Tree);
+var Tree$1 = /*#__PURE__*/React.memo(Tree);
 
 module.exports = Tree$1;

@@ -1,19 +1,19 @@
 import { useState, useCallback } from 'react';
 
-const useInternalState = ({ value: valueProp, defaultValue, onChange }) => {
+import { isUndefined, isFn } from './utils';
+
+const useInternalState = (valueProp, defaultValue) => {
     const [valueState, setValueState] = useState(defaultValue);
-    const isUncontrolled = typeof valueProp === 'undefined';
+    const isUncontrolled = isUndefined(valueProp);
     const value = isUncontrolled ? valueState : valueProp;
 
     const updateValue = useCallback(
-        (nextValue) => {
+        (next) => {
             if (isUncontrolled) {
-                setValueState(nextValue);
+                setValueState(next);
             }
-
-            onChange(nextValue);
         },
-        [isUncontrolled, onChange, value]
+        [isUncontrolled, value]
     );
 
     return [value, updateValue];

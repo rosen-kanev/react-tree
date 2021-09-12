@@ -1,11 +1,10 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef, memo } from 'react';
 import PropTypes from 'prop-types';
 
 import TreeItem from './TreeItem.jsx';
-import TreeContext from './TreeContext.js';
 import useInternalState from './useInternalState.js';
 
-const noop = () => {};
+import { findNode, noop, isUndefined } from './utils';
 
 /**
  * An accessible tree view component, based on the WAI-ARIA authoring practices for accessible widgets.
@@ -17,54 +16,30 @@ const Tree = ({
 
     defaultFocused,
     focused: focusedProp,
-    onFocusChange,
+    onFocusChange = noop,
 
     defaultExpanded = [],
     expanded: expandedProp,
-    onExpandChange,
+    onExpandChange = noop,
 
     defaultSelected,
     selected: selectedProp,
-    onSelectChange,
+    onSelectChange = noop,
 
     renderLabel,
+    expandOnSelect = true,
     ...rest
 }) => {
     const rootEl = useRef(null);
-    const [focused, setFocused] = useInternalState({
-        defaultValue:
-            typeof focusedProp === 'undefined'
-                ? typeof defaultFocused === 'undefined' && nodes.length > 0
-                    ? nodes[0].id
-                    : defaultFocused
-                : undefined,
-        value: focusedProp,
-        onChange: typeof onFocusChange === 'function' ? onFocusChange : noop,
-    });
-    const [expanded, setExpanded] = useInternalState({
-        defaultValue: defaultExpanded,
-        value: expandedProp,
-        onChange: typeof onExpandChange === 'function' ? onExpandChange : noop,
-    });
-    const [selected, setSelected] = useInternalState({
-        defaultValue: defaultSelected,
-        value: selectedProp,
-        onChange: typeof onSelectChange === 'function' ? onSelectChange : noop,
-    });
+    const initialFocus = isUndefined(focusedProp)
+        ? isUndefined(defaultFocused) && nodes.length > 0
+            ? nodes[0].id
+            : defaultFocused
+        : undefined;
 
-    useEffect(() => {
-        const nodes = rootEl.current.querySelectorAll(`[data-expandable]`);
-
-        nodes.forEach((node) => {
-            const nodeId = node.dataset.id.replace('treeitem-', '');
-
-            if (expanded.includes(nodeId)) {
-                node.setAttribute('aria-expanded', 'true');
-            } else {
-                node.setAttribute('aria-expanded', 'false');
-            }
-        });
-    }, [expanded]);
+    const [focused, setFocused] = useInternalState(focusedProp, initialFocus);
+    const [expanded, setExpanded] = useInternalState(expandedProp, defaultExpanded);
+    const [selected, setSelected] = useInternalState(selectedProp, defaultSelected);
 
     useEffect(() => {
         // remove tabIndex from previous and add it to current
@@ -75,6 +50,7 @@ const Tree = ({
             oldNode.setAttribute('tabindex', '-1');
         }
 
+        /* istanbul ignore next when nodes is empty it's okay not to have a focused element */
         if (node) {
             node.setAttribute('tabindex', '0');
         }
@@ -89,19 +65,30 @@ const Tree = ({
             oldNode.removeAttribute('aria-selected');
         }
 
+        // selected node is optional so we don't show a warning if no node is found
         if (node) {
             node.setAttribute('aria-selected', 'true');
         }
     }, [selected]);
 
-    const onItemSelect = useCallback((id, isExpandable) => {
-        if (isExpandable) {
-            setExpanded((prev) => (prev.includes(id) ? prev.filter((node) => node !== id) : prev.concat(id)));
+    // This function is passed as a prop to <TreeItem />, but it has custom `memo(arePropsEqual)`
+    // which ignores object identity changes. If the `memo()` changes make sure to wrap this with `useCallback()`
+    const onItemSelect = (id, isExpandable) => {
+        const node = findNode(nodes, id);
+
+        if (expandOnSelect && isExpandable) {
+            setExpanded((prev) => {
+                return prev.includes(id) ? prev.filter((node) => node !== id) : prev.concat(id);
+            });
+            onExpandChange(node);
         }
 
         setFocused(id);
+        onFocusChange(node);
+
         setSelected(id);
-    }, []);
+        onSelectChange(node);
+    };
 
     const moveToTreeItem = (isPrev) => {
         const items = rootEl.current.querySelectorAll('[role="treeitem"]');
@@ -118,8 +105,10 @@ const Tree = ({
 
         if (nextNode) {
             const id = nextNode.dataset.id.replace('treeitem-', '');
+            const node = findNode(nodes, id);
 
             setFocused(id);
+            onFocusChange(node);
 
             nextNode.focus();
             nextNode.firstElementChild.scrollIntoView({ block: 'center' });
@@ -149,7 +138,10 @@ const Tree = ({
 
             if (isExpandable && isExpanded) {
                 // close node
-                setExpanded(expanded.filter((node) => node !== focused));
+                const node = findNode(nodes, focused);
+
+                setExpanded((prev) => prev.filter((node) => node !== focused));
+                onExpandChange(node);
             } else {
                 // move focus to parent node
                 focusItem(treeItem.closest('[role="treeitem"]:not([tabindex="0"])'));
@@ -165,7 +157,10 @@ const Tree = ({
                     focusItem(treeItem.querySelector('[role="treeitem"]'));
                 } else {
                     // open node
-                    setExpanded(expanded.concat(focused));
+                    const node = findNode(nodes, focused);
+
+                    setExpanded((prev) => prev.concat(focused));
+                    onExpandChange(node);
                 }
             }
         } else if (e.key === 'Enter' || e.key === ' ') {
@@ -195,15 +190,23 @@ const Tree = ({
             item.firstElementChild.scrollIntoView({ block: 'center' });
 
             const id = item.dataset.id.replace('treeitem-', '');
+            const node = findNode(nodes, id);
 
             setFocused(id);
+            onFocusChange(node);
         }
     };
 
     return (
         <ul role="tree" onKeyDown={onKeyDown} {...rest} ref={rootEl}>
             {nodes.map((node) => (
-                <TreeItem {...node} onItemSelect={onItemSelect} renderLabel={renderLabel} key={node.id} />
+                <TreeItem
+                    {...node}
+                    expanded={expanded}
+                    onItemSelect={onItemSelect}
+                    renderLabel={renderLabel}
+                    key={node.id}
+                />
             ))}
         </ul>
     );
@@ -278,7 +281,7 @@ if (process.env.NODE_ENV !== 'production') {
             }
 
             if (Array.isArray(value)) {
-                const message = `You provided an array as an index in ${comp} but one or more of the values are not string.`;
+                const message = `You provided an array as \`${name}\` in ${comp} but one or more of the values are not string.`;
 
                 return value.some((i) => typeof i !== 'string') ? new Error(message) : null;
             }
@@ -316,4 +319,4 @@ if (process.env.NODE_ENV !== 'production') {
     };
 }
 
-export default Tree;
+export default memo(Tree);

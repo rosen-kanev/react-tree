@@ -1,17 +1,17 @@
-import React, { memo } from 'react';
+import React from 'react';
 
-import TreeContext from './TreeContext';
+import { propsAreEqual, isFn } from './utils';
 
-const isFn = (value) => typeof value === 'function';
-
-const TreeItem = ({ onItemSelect, renderLabel, ...props }) => {
+const TreeItem = ({ onItemSelect, renderLabel, expanded, ...props }) => {
     const isExpandable = props.nodes.length > 0;
+    const isExpanded = isExpandable ? expanded.includes(props.id) : null;
 
     return (
-        <li role="treeitem" tabIndex={-1} data-expandable={isExpandable ? '' : null} data-id={`treeitem-${props.id}`}>
+        <li role="treeitem" tabIndex={-1} aria-expanded={isExpanded} data-id={`treeitem-${props.id}`}>
             {isFn(renderLabel) ? (
                 renderLabel({
                     ...props,
+                    isExpanded,
                     isExpandable,
                     toggleItem() {
                         onItemSelect(props.id, isExpandable);
@@ -21,10 +21,16 @@ const TreeItem = ({ onItemSelect, renderLabel, ...props }) => {
                 <div onClick={() => onItemSelect(props.id, isExpandable)}>{props.label}</div>
             )}
 
-            {isExpandable && (
+            {isExpanded && isExpandable && (
                 <ul role="group">
                     {props.nodes.map((node) => (
-                        <TreeItem {...node} onItemSelect={onItemSelect} renderLabel={renderLabel} key={node.id} />
+                        <MemoTreeItem
+                            {...node}
+                            expanded={expanded}
+                            onItemSelect={onItemSelect}
+                            renderLabel={renderLabel}
+                            key={node.id}
+                        />
                     ))}
                 </ul>
             )}
@@ -37,4 +43,6 @@ if (process.env.NODE_ENV !== 'production') {
     TreeItem.displayName = 'TreeItem';
 }
 
-export default memo(TreeItem);
+const MemoTreeItem = React.memo(TreeItem, propsAreEqual);
+
+export default MemoTreeItem;

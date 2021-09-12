@@ -31,20 +31,3 @@ code {
 [role='treeitem'] > div {
     border: 2px solid transparent;
 }
-
-[role='treeitem']:not([aria-expanded='true']) > [role='group'] {
-    display: none;
-}
-
-.arrow-down,
-.arrow-right {
-    display: none;
-}
-
-[role='treeitem'][aria-expanded='true'] > div > .arrow-down {
-    display: inline;
-}
-
-[role='treeitem'][aria-expanded='false'] > div > .arrow-right {
-    display: inline;
-}
