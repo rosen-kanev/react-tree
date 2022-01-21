@@ -23,11 +23,32 @@ code {
 [role='treeitem']:focus {
     outline: 0;
 }
-[role='treeitem']:focus > div {
+
+.vanilla [role='treeitem']:focus > div {
     border-color: #2563eb;
     background-color: #e4e4e7;
 }
 
 [role='treeitem'] > div {
     border: 2px solid transparent;
+}
+
+.virtual {
+    --indent: 1.5rem;
+    height: 400px;
+    overflow: auto;
+}
+
+.virtual [role='treeitem'] {
+    height: 30px;
+    margin-left: calc((var(--indent, 10px) * (var(--level) - 1)));
+}
+
+.virtual[role='tree'] {
+    outline: 0;
+}
+
+.virtual [role='treeitem']:focus > div {
+    border-color: #2563eb;
+    background-color: #e4e4e7;
 }

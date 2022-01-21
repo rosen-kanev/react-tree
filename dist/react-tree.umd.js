@@ -1,12 +1,11 @@
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('react'), require('prop-types')) :
-  typeof define === 'function' && define.amd ? define(['react', 'prop-types'], factory) :
-  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.ReactTree = factory(global.React, global.PropTypes));
-}(this, (function (React, PropTypes) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('react'), require('prop-types'), require('react-virtual')) :
+  typeof define === 'function' && define.amd ? define(['exports', 'react', 'prop-types', 'react-virtual'], factory) :
+  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.ReactTree = {}, global.React, global.PropTypes, global.ReactVirtual));
+})(this, (function (exports, react, PropTypes, reactVirtual) { 'use strict';
 
   function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
 
-  var React__default = /*#__PURE__*/_interopDefaultLegacy(React);
   var PropTypes__default = /*#__PURE__*/_interopDefaultLegacy(PropTypes);
 
   function _extends() {
@@ -30,41 +29,188 @@
   const noop = () => {};
   const isFn = value => typeof value === 'function';
   const isUndefined = value => typeof value === 'undefined';
-  const getNodeIds = nodes => {
-    const stack = [...nodes];
-    const result = [];
+  const getNodeAt = (nodes, index) => {
+    const path = index.split('-');
+    let node = {
+      nodes
+    };
+    let i = 0;
 
-    while (stack.length) {
-      const node = stack.pop();
-      result.push(node.id);
-      stack.push(...node.nodes);
+    while (node != null && i < path.length) {
+      node = node.nodes[path[i++]];
     }
 
-    return result;
+    return i && i === path.length ? node : undefined;
   };
-  const findNode = (nodes, id) => {
-    const stack = [...nodes];
+  const moveUp = (current, nodes) => {
+    if (current.dataset.index === '0') {
+      // we are at the start of the tree
+      return [null, null];
+    }
 
-    while (stack.length) {
-      const node = stack.pop();
+    if (current.previousElementSibling) {
+      // move back a node and find the deepest leaf node
+      let item = current.previousElementSibling;
 
-      if (node.id === id) {
-        return node;
+      while (true) {
+        const {
+          isExpanded,
+          isExpandable
+        } = getExpandState(item);
+
+        if (isExpandable && isExpanded) {
+          // ├─ node_modules
+          // │  └─ @babel
+          // │     ├─ code-frame
+          // │     └─ compat-data (next)
+          // ├─ src (current)
+          item = item.lastElementChild.lastElementChild;
+        } else {
+          break;
+        }
       }
 
-      stack.push(...node.nodes);
+      return [item, getNodeAt(nodes, item.dataset.index)];
+    } else {
+      // ├─ node_modules
+      // │  └─ @babel (next)
+      // │     ├─ code-frame (current)
+      // │     └─ compat-data
+      return moveToParent(current, nodes);
+    }
+  };
+  const moveDown = (current, nodes) => {
+    let item = current;
+    const {
+      isExpanded
+    } = getExpandState(current);
+
+    if (isExpanded) {
+      // ├─ node_modules (current)
+      // │  └─ @babel (next)
+      // │     ├─ code-frame
+      // │     └─ compat-data
+      // ├─ src
+      item = current.lastElementChild.firstElementChild;
+    } else {
+      // go to parent and find its next sibling until we find a node or reach the end of the tree
+      // ├─ node_modules
+      // │  └─ @babel
+      // │     ├─ code-frame
+      // │     └─ compat-data (current)
+      // ├─ src (next)
+      while (true) {
+        // ├─ node_modules
+        // │  └─ @babel
+        // │     ├─ code-frame
+        // │     └─ compat-data (current)
+        if (isLastItem(item, nodes)) {
+          // we are at the end of the tree
+          return [null, null];
+        }
+
+        if (item.nextElementSibling) {
+          item = item.nextElementSibling;
+          break;
+        }
+
+        item = item.parentElement.parentElement;
+      }
     }
 
-    return null;
-  }; // shallow equals check, but without `expanded` and `onItemSelect`
+    return [item, getNodeAt(nodes, item.dataset.index)];
+  };
+  const moveLeft = (current, nodes) => {
+    const {
+      isExpandable,
+      isExpanded
+    } = getExpandState(current);
+    const index = current.dataset.index;
 
-  const shallowEquals = (prev, next) => {
+    if (isExpandable && isExpanded) {
+      // ├─ src (current)
+      // │ ├─ App.jsx
+      // │ └─ data.js       -> ├─ src (next)
+      // ├─ .editorconfig      ├─ .editorconfig
+      // └─ .gitignore.js      └─ .gitignore.js
+      return [null, getNodeAt(nodes, index)];
+    } else {
+      // ├─ src (next)
+      // │ ├─ App.jsx
+      // │ └─ data.js (current)
+      // ├─ .editorconfig
+      // └─ .gitignore.js
+      return moveToParent(current, nodes);
+    }
+  };
+  const moveRight = (current, nodes) => {
+    const {
+      isExpandable,
+      isExpanded
+    } = getExpandState(current);
+
+    if (isExpandable) {
+      const index = current.dataset.index;
+      const node = getNodeAt(nodes, index);
+
+      if (isExpanded) {
+        // ├─ src (current)
+        // │ ├─ App.jsx (next)
+        // │ └─ data.js
+        // ├─ .editorconfig
+        // └─ .gitignore.js
+        const item = current.lastElementChild.firstElementChild;
+        const next = node.nodes[0];
+        return [item, next];
+      } else {
+        // ├─ src (current)      ├─ src (next)
+        // ├─ .editorconfig      │ ├─ App.jsx
+        // └─ .gitignore.js   -> │ └─ data.js
+        //                       ├─ .editorconfig
+        //                       └─ .gitignore.js
+        return [null, node];
+      }
+    } // ├─ src
+    // │ ├─ App.jsx
+    // │ └─ data.js
+    // ├─ .editorconfig (current)
+    // └─ .gitignore.js
+
+
+    return [null, null];
+  };
+
+  const moveToParent = (current, nodes) => {
+    const path = current.dataset.index.split('-');
+
+    if (path.length > 1) {
+      const item = current.parentElement.parentElement;
+      return [item, getNodeAt(nodes, item.dataset.index)];
+    }
+
+    return [null, null];
+  };
+
+  const getExpandState = node => {
+    const ariaExpandedAttribute = node.getAttribute('aria-expanded');
+    return {
+      isExpandable: ariaExpandedAttribute !== null,
+      isExpanded: ariaExpandedAttribute === 'true'
+    };
+  };
+
+  const isLastItem = (item, nodes) => {
+    const path = item.dataset.index.split('-');
+    return path.length === 1 && parseInt(path[0], 10) === nodes.length - 1;
+  };
+
+  const shallowEquals = (prev, next, ignored) => {
     if (Object.is(prev, next)) {
       return true;
     }
 
-    const keysPrev = Object.keys(prev).filter(key => key !== 'expanded' && key !== 'onItemSelect');
-    const keysNext = Object.keys(next).filter(key => key !== 'expanded' && key !== 'onItemSelect');
+    const keysPrev = Object.keys(prev).filter(key => !ignored.includes(key));
+    const keysNext = Object.keys(next).filter(key => !ignored.includes(key));
 
     if (keysPrev.length !== keysNext.length) {
       return false;
@@ -78,65 +224,93 @@
 
     return true;
   };
-  const propsAreEqual = (prev, next) => {
-    const id = next.id;
-    const areOtherPropsDifferent = !shallowEquals(prev, next);
+  const internalId = Symbol('id');
+  const addInternalIds = (nodes, parentId) => {
+    let result = [];
+    let i = nodes.length - 1;
 
-    if (areOtherPropsDifferent) {
-      return false;
+    while (i >= 0) {
+      result.push({ ...nodes[i],
+        [internalId]: parentId ? `${parentId}-${i}` : `${i}`
+      });
+      i--;
     }
 
-    if (prev.expanded.includes(id) !== next.expanded.includes(id)) {
-      return false;
-    } // We don't do a check if prev.expanded has children to update, because this node won't render any children.
-    // This way we can skip the checks for it and its children - they won't render either way...
+    return result;
+  };
+  const flattenData = (nodes, expanded) => {
+    const stack = addInternalIds(nodes, '');
+    const tree = [];
 
+    while (stack.length) {
+      const node = stack.pop();
+      tree.push(node);
 
-    if (next.expanded.includes(id)) {
-      // this node has children that may need updates
-      const children = getNodeIds(next.nodes);
-
-      for (const child of children) {
-        if (prev.expanded.includes(child) !== next.expanded.includes(child)) {
-          // a child node needs to be updated
-          return false;
-        }
+      if (expanded.includes(node.id)) {
+        stack.push(...addInternalIds(node.nodes, node[internalId]));
       }
     }
 
-    return true;
+    return tree;
   };
 
-  const TreeItem = ({
-    onItemSelect,
-    renderLabel,
-    expanded,
-    ...props
-  }) => {
+  const TreeItem = _ref => {
+    let {
+      onItemSelect,
+      renderLabel,
+      focused,
+      selected,
+      expanded,
+      index,
+      setSize,
+      counter,
+      onKeyDown,
+      ...props
+    } = _ref;
     const isExpandable = props.nodes.length > 0;
     const isExpanded = isExpandable ? expanded.includes(props.id) : null;
-    return /*#__PURE__*/React__default['default'].createElement("li", {
-      role: "treeitem",
-      tabIndex: -1,
-      "aria-expanded": isExpanded,
-      "data-id": `treeitem-${props.id}`
-    }, isFn(renderLabel) ? renderLabel({ ...props,
-      isExpanded,
-      isExpandable,
-
-      toggleItem() {
-        onItemSelect(props.id, isExpandable);
+    const path = index.split('-');
+    const positionInSet = parseInt(path[path.length - 1], 10) + 1;
+    const el = react.useRef();
+    react.useEffect(() => {
+      if (counter > 0 && focused === props.id) {
+        if (el.current) {
+          el.current.focus();
+          el.current.firstElementChild.scrollIntoView({
+            block: 'nearest'
+          });
+        }
       }
-
-    }) : /*#__PURE__*/React__default['default'].createElement("div", {
-      onClick: () => onItemSelect(props.id, isExpandable)
-    }, props.label), isExpanded && isExpandable && /*#__PURE__*/React__default['default'].createElement("ul", {
+    }, [counter]);
+    return /*#__PURE__*/React.createElement("li", {
+      ref: el,
+      role: "treeitem",
+      tabIndex: focused === props.id ? 0 : -1,
+      "aria-expanded": isExpanded,
+      "aria-selected": selected === props.id || null,
+      "aria-level": path.length,
+      "aria-posinset": positionInSet,
+      "aria-setsize": setSize,
+      "data-index": index,
+      onKeyDown: onKeyDown
+    }, isFn(renderLabel) ? renderLabel(props, {
+      isExpandable,
+      isExpanded
+    }) : /*#__PURE__*/React.createElement("div", {
+      onClick: () => onItemSelect(props)
+    }, props.label), isExpanded && isExpandable && /*#__PURE__*/React.createElement("ul", {
       role: "group"
-    }, props.nodes.map(node => /*#__PURE__*/React__default['default'].createElement(MemoTreeItem, _extends({}, node, {
+    }, props.nodes.map((node, childIndex) => /*#__PURE__*/React.createElement(MemoTreeItem, _extends({}, node, {
+      key: node.id,
+      index: index + '-' + childIndex,
+      selected: selected,
+      focused: focused,
       expanded: expanded,
-      onItemSelect: onItemSelect,
+      setSize: props.nodes.length,
+      counter: counter,
       renderLabel: renderLabel,
-      key: node.id
+      onItemSelect: onItemSelect,
+      onKeyDown: onKeyDown
     })))));
   };
   /* istanbul ignore next */
@@ -146,13 +320,54 @@
     TreeItem.displayName = 'TreeItem';
   }
 
-  const MemoTreeItem = /*#__PURE__*/React__default['default'].memo(TreeItem, propsAreEqual);
+  const propsAreEqual = (prev, next) => {
+    // ignore object identity of these props
+    const ignored = ['counter', 'selected', 'focused', 'expanded', 'onItemSelect', 'onKeyDown'];
+    const areOtherPropsDifferent = !shallowEquals(prev, next, ignored);
+
+    if (areOtherPropsDifferent) {
+      // other props are different - trigger a rerender
+      return false;
+    } // breadth first traverse - when working with file system like trees the user usually starts from the outer nodes
+    // and most of the tree changes will be happening near the root of the tree
+
+
+    const stack = [{ ...next,
+      nodes: []
+    }, ...next.nodes];
+
+    while (stack.length) {
+      const node = stack.shift();
+
+      if (node.id === next.focused || node.id === prev.focused) {
+        // a node or one of its children has to change its `tabIndex` - trigger a rerender
+        return false;
+      }
+
+      if (node.id === next.selected || node.id === prev.selected) {
+        // a node or one of its children has to change its `aria-selected` - trigger a rerender
+        return false;
+      }
+
+      if (prev.expanded.includes(node.id) !== next.expanded.includes(node.id)) {
+        // a node or one of its children has to be collapsed/expanded - trigger a rerender
+        return false;
+      }
+
+      stack.push(...node.nodes);
+    }
+
+    return true;
+  };
+
+  const MemoTreeItem = /*#__PURE__*/react.memo(TreeItem, propsAreEqual);
+  var TreeItem$1 = MemoTreeItem;
 
   const useInternalState = (valueProp, defaultValue) => {
-    const [valueState, setValueState] = React.useState(defaultValue);
+    const [valueState, setValueState] = react.useState(defaultValue);
     const isUncontrolled = isUndefined(valueProp);
     const value = isUncontrolled ? valueState : valueProp;
-    const updateValue = React.useCallback(next => {
+    const updateValue = react.useCallback(next => {
       if (isUncontrolled) {
         setValueState(next);
       }
@@ -160,290 +375,568 @@
     return [value, updateValue];
   };
 
+  var useInternalState$1 = useInternalState;
+
+  const getErrorForControlled = (propName, componentName, handlerName, defaultPropName) => {
+    return `You provided a \`${propName}\` prop to ${componentName} without an \`${handlerName}\` handler. ` + `This will cause the ${componentName} component to behave incorrectly. ` + `If the ${componentName} should be mutable use \`${defaultPropName}\` instead. Otherwise, set \`${handlerName}\`.`;
+  };
+
+  const getErrorForUncontrolled = (propName, componentName, handlerName, defaultPropName) => {
+    return `You provided a \`${propName}\` prop as well as a \`${defaultPropName}\` prop to ${componentName}. ` + `If you want a controlled component, use the \`${propName}\` prop with an \`${handlerName}\` handler. ` + `If you want an uncontrolled component, remove the \`${propName}\` prop and use \`${defaultPropName}\` instead.`;
+  };
+
+  const getGenericTypeError = (name, componentName, expectedType, value) => {
+    return `Invalid prop \`${name}\` supplied to ${componentName}. Expected \`${expectedType}\`, received \`${Array.isArray(value) ? 'array' : typeof value}\`.`;
+  };
+
+  let nodeShape = {
+    id: PropTypes__default["default"].string.isRequired,
+    label: PropTypes__default["default"].oneOfType([PropTypes__default["default"].string, PropTypes__default["default"].node])
+  };
+  nodeShape.nodes = PropTypes__default["default"].arrayOf(PropTypes__default["default"].shape(nodeShape));
+  const basePropTypes = {
+    nodes: PropTypes__default["default"].arrayOf(PropTypes__default["default"].shape(nodeShape)).isRequired,
+    defaultFocused: PropTypes__default["default"].string,
+    focused: (props, name, componentName) => {
+      const value = props[name];
+      const comp = `\`<${componentName}>\``;
+
+      if (typeof value === 'string' && props.onFocusChange == null) {
+        return new Error(getErrorForControlled(name, comp, 'onFocusChange', 'defaultFocused'));
+      }
+
+      if (value != null && props.defaultFocused != null) {
+        return new Error(getErrorForUncontrolled(name, comp, 'onFocusChange', 'defaultFocused'));
+      }
+
+      if (value != null && typeof value !== 'string') {
+        return new Error(getGenericTypeError(name, comp, 'string', value));
+      }
+
+      return null;
+    },
+    onFocusChange: PropTypes__default["default"].func,
+    defaultExpanded: PropTypes__default["default"].arrayOf(PropTypes__default["default"].string),
+    expanded: (props, name, componentName) => {
+      const value = props[name];
+      const comp = `\`<${componentName}>\``;
+
+      if (Array.isArray(value) && props.onExpandChange == null) {
+        return new Error(getErrorForControlled(name, comp, 'onExpandChange', 'defaultExpanded'));
+      }
+
+      if (value != null && props.defaultExpanded != null) {
+        return new Error(getErrorForUncontrolled(name, comp, 'onExpandChange', 'defaultExpanded'));
+      }
+
+      if (Array.isArray(value)) {
+        const message = `You provided an array as \`${name}\` in ${comp} but one or more of the values are not string.`;
+        return value.some(i => typeof i !== 'string') ? new Error(message) : null;
+      }
+
+      if (value != null && !Array.isArray(value)) {
+        return new Error(getGenericTypeError(name, comp, 'array', value));
+      }
+
+      return null;
+    },
+    onExpandChange: PropTypes__default["default"].func,
+    selectionTogglesExpanded: PropTypes__default["default"].bool,
+    selectionFollowsFocus: PropTypes__default["default"].bool,
+    defaultSelected: PropTypes__default["default"].string,
+    selected: (props, name, componentName) => {
+      const value = props[name];
+      const comp = `\`<${componentName}>\``;
+
+      if (typeof value === 'string' && props.onSelectChange == null) {
+        return new Error(getErrorForControlled(name, comp, 'onSelectChange', 'defaultSelected'));
+      }
+
+      if (value != null && props.defaultSelected != null) {
+        return new Error(getErrorForUncontrolled(name, comp, 'onSelectChange', 'defaultSelected'));
+      }
+
+      if (value != null && typeof value !== 'string') {
+        return new Error(getGenericTypeError(name, comp, 'string', value));
+      }
+
+      return null;
+    },
+    onSelectChange: PropTypes__default["default"].func,
+    renderLabel: (props, name, componentName) => {
+      const value = props[name];
+      const comp = `\`<${componentName}>\``;
+
+      if (typeof value !== 'function') {
+        const stack = [...props.nodes];
+
+        while (stack.length) {
+          const node = stack.pop();
+
+          if (node.label == null) {
+            const message = `You didn't provide a \`renderLabel\` function in ${comp} ` + `but one or more values in the \`nodes\` prop don't have a valid \`label\` prop.`;
+            return new Error(message);
+          }
+
+          stack.push(...node.nodes);
+        }
+      }
+
+      return null;
+    }
+  };
+  var basePropTypes$1 = basePropTypes;
+
   /**
    * An accessible tree view component, based on the WAI-ARIA authoring practices for accessible widgets.
    *
    * @see WAI-ARIA https://www.w3.org/TR/wai-aria-practices-1.2/#TreeView
    */
 
-  const Tree = ({
-    nodes,
-    defaultFocused,
-    focused: focusedProp,
-    onFocusChange = noop,
-    defaultExpanded = [],
-    expanded: expandedProp,
-    onExpandChange = noop,
-    defaultSelected,
-    selected: selectedProp,
-    onSelectChange = noop,
-    renderLabel,
-    expandOnSelect = true,
-    ...rest
-  }) => {
-    const rootEl = React.useRef(null);
+  const TreeImpl = (_ref, ref) => {
+    let {
+      nodes,
+      defaultFocused,
+      focused: focusedProp,
+      onFocusChange = noop,
+      defaultExpanded = [],
+      expanded: expandedProp,
+      onExpandChange = noop,
+      selectionTogglesExpanded = true,
+      selectionFollowsFocus,
+      defaultSelected,
+      selected: selectedProp,
+      onSelectChange = noop,
+      renderLabel,
+      ...rest
+    } = _ref;
     const initialFocus = isUndefined(focusedProp) ? isUndefined(defaultFocused) && nodes.length > 0 ? nodes[0].id : defaultFocused : undefined;
-    const [focused, setFocused] = useInternalState(focusedProp, initialFocus);
-    const [expanded, setExpanded] = useInternalState(expandedProp, defaultExpanded);
-    const [selected, setSelected] = useInternalState(selectedProp, defaultSelected);
-    React.useEffect(() => {
-      // remove tabIndex from previous and add it to current
-      const node = rootEl.current.querySelector(`[data-id="treeitem-${focused}"]`);
-      const oldNode = rootEl.current.querySelector(`[tabindex="0"]`);
+    const [focused, setFocused] = useInternalState$1(focusedProp, initialFocus);
+    const [expanded, setExpanded] = useInternalState$1(expandedProp, defaultExpanded);
+    const [selected, setSelected] = useInternalState$1(selectedProp, defaultSelected); // hacky way to signal the currently `focused` TreeItem to call el.focus()
 
-      if (oldNode) {
-        oldNode.setAttribute('tabindex', '-1');
-      }
-      /* istanbul ignore next when nodes is empty it's okay not to have a focused element */
-
-
-      if (node) {
-        node.setAttribute('tabindex', '0');
-      }
-    }, [focused]);
-    React.useEffect(() => {
-      // remove aria-selected from previous and add it to current
-      const node = rootEl.current.querySelector(`[data-id="treeitem-${selected}"]`);
-      const oldNode = rootEl.current.querySelector(`[aria-selected="true"]`);
-
-      if (oldNode) {
-        oldNode.removeAttribute('aria-selected');
-      } // selected node is optional so we don't show a warning if no node is found
-
-
-      if (node) {
-        node.setAttribute('aria-selected', 'true');
-      }
-    }, [selected]); // This function is passed as a prop to <TreeItem />, but it has custom `memo(arePropsEqual)`
-    // which ignores object identity changes. If the `memo()` changes make sure to wrap this with `useCallback()`
-
-    const onItemSelect = (id, isExpandable) => {
-      const node = findNode(nodes, id);
-
-      if (expandOnSelect && isExpandable) {
-        setExpanded(prev => {
-          return prev.includes(id) ? prev.filter(node => node !== id) : prev.concat(id);
-        });
-        onExpandChange(node);
-      }
-
-      setFocused(id);
-      onFocusChange(node);
-      setSelected(id);
-      onSelectChange(node);
-    };
-
-    const moveToTreeItem = isPrev => {
-      const items = rootEl.current.querySelectorAll('[role="treeitem"]');
-      let nextNode;
-
-      for (let i = 0; i < items.length; i++) {
-        const element = items[i];
-
-        if (element.tabIndex === 0) {
-          nextNode = isPrev ? items[i - 1] : items[i + 1];
-          break;
+    const [counter, setCounter] = react.useState(0);
+    react.useImperativeHandle(ref, () => {
+      return {
+        focus() {
+          setCounter(prev => prev + 1);
         }
-      }
 
-      if (nextNode) {
-        const id = nextNode.dataset.id.replace('treeitem-', '');
-        const node = findNode(nodes, id);
-        setFocused(id);
-        onFocusChange(node);
-        nextNode.focus();
-        nextNode.firstElementChild.scrollIntoView({
-          block: 'center'
-        });
-      }
-    };
+      };
+    });
 
     const onKeyDown = e => {
       /* istanbul ignore next we test this, but the code coverage tool is still unconvinced */
-      if (!nodes.length || e.altKey || e.ctrlKey || e.metaKey) {
+      if (!nodes.length || e.altKey || e.ctrlKey || e.metaKey || e.target !== e.currentTarget) {
         return;
       }
 
       if (e.key === 'ArrowUp') {
-        e.preventDefault(); // move to previous node that is visible on the screen
+        e.preventDefault();
+        const [item, node] = moveUp(e.currentTarget, nodes);
 
-        moveToTreeItem(true);
+        if (item) {
+          focusTreeItem(item, node);
+        }
       } else if (e.key === 'ArrowDown') {
-        e.preventDefault(); // move to next node that is visible on the screen
+        e.preventDefault();
+        const [item, node] = moveDown(e.currentTarget, nodes);
 
-        moveToTreeItem(false);
+        if (item) {
+          focusTreeItem(item, node);
+        }
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        const {
-          treeItem,
-          isExpandable,
-          isExpanded
-        } = getTreeItem(focused);
+        const [item, node] = moveLeft(e.currentTarget, nodes);
 
-        if (isExpandable && isExpanded) {
-          // close node
-          const node = findNode(nodes, focused);
-          setExpanded(prev => prev.filter(node => node !== focused));
+        if (item) {
+          focusTreeItem(item, node);
+        }
+
+        if (!item && node) {
+          setExpanded(prev => prev.filter(id => id !== node.id));
           onExpandChange(node);
-        } else {
-          // move focus to parent node
-          focusItem(treeItem.closest('[role="treeitem"]:not([tabindex="0"])'));
         }
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        const {
-          treeItem,
-          isExpandable,
-          isExpanded
-        } = getTreeItem(focused);
+        const [item, node] = moveRight(e.currentTarget, nodes);
 
-        if (isExpandable) {
-          if (isExpanded) {
-            // move focus to next child node
-            focusItem(treeItem.querySelector('[role="treeitem"]'));
-          } else {
-            // open node
-            const node = findNode(nodes, focused);
-            setExpanded(prev => prev.concat(focused));
-            onExpandChange(node);
-          }
+        if (item) {
+          focusTreeItem(item, node);
+        }
+
+        if (!item && node) {
+          setExpanded(prev => prev.concat(node.id));
+          onExpandChange(node);
         }
       } else if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        const isExpandable = rootEl.current.querySelector(`[data-id="treeitem-${focused}"]`).hasAttribute('aria-expanded');
-        onItemSelect(focused, isExpandable);
+        const node = getNodeAt(nodes, e.currentTarget.dataset.index);
+        onItemSelect(node);
+      }
+    }; // @todo since the el.focus() call was moved to the TreeItem we no longer need the el
+
+
+    const focusTreeItem = (el, node) => {
+      setCounter(prev => prev + 1);
+      setFocused(node.id);
+      onFocusChange(node);
+
+      if (selectionFollowsFocus) {
+        setSelected(node.id);
+        onSelectChange(node);
       }
     };
 
-    const getTreeItem = id => {
-      const treeItem = rootEl.current.querySelector(`[data-id="treeitem-${id}"]`);
-      return {
-        treeItem,
-        isExpandable: treeItem.hasAttribute('aria-expanded'),
-        isExpanded: treeItem.getAttribute('aria-expanded') === 'true'
-      };
-    };
-
-    const focusItem = item => {
-      if (item) {
-        item.focus();
-        item.firstElementChild.scrollIntoView({
-          block: 'center'
+    const onItemSelect = node => {
+      if (selectionTogglesExpanded && node.nodes.length > 0) {
+        setExpanded(prev => {
+          return prev.includes(node.id) ? prev.filter(id => id !== node.id) : prev.concat(node.id);
         });
-        const id = item.dataset.id.replace('treeitem-', '');
-        const node = findNode(nodes, id);
-        setFocused(id);
+        onExpandChange(node);
+      }
+
+      if (node.id !== focused) {
+        setFocused(node.id);
         onFocusChange(node);
       }
+
+      setSelected(node.id);
+      onSelectChange(node);
     };
 
-    return /*#__PURE__*/React__default['default'].createElement("ul", _extends({
-      role: "tree",
-      onKeyDown: onKeyDown
-    }, rest, {
-      ref: rootEl
-    }), nodes.map(node => /*#__PURE__*/React__default['default'].createElement(MemoTreeItem, _extends({}, node, {
+    return /*#__PURE__*/React.createElement("ul", _extends({
+      role: "tree"
+    }, rest), nodes.map((node, index) => /*#__PURE__*/React.createElement(TreeItem$1, _extends({}, node, {
+      key: node.id,
+      index: `${index}`,
+      selected: selected,
+      focused: focused,
       expanded: expanded,
-      onItemSelect: onItemSelect,
+      setSize: nodes.length,
+      counter: counter,
       renderLabel: renderLabel,
-      key: node.id
+      onItemSelect: onItemSelect,
+      onKeyDown: onKeyDown
     }))));
+  };
+
+  const Tree = /*#__PURE__*/react.forwardRef(TreeImpl);
+  /* istanbul ignore next */
+
+  {
+    Tree.displayName = 'Tree';
+    Tree.propTypes = { ...basePropTypes$1
+    };
+  }
+
+  var Tree$1 = /*#__PURE__*/react.memo(Tree);
+
+  const VirtualTreeItem = _ref => {
+    let {
+      measureRef,
+      start,
+      isExpanded,
+      isSelected,
+      tabIndex,
+      level,
+      positionInSet,
+      setSize,
+      index,
+      renderLabel,
+      onItemSelect,
+      onKeyDown,
+      ...props
+    } = _ref;
+    return /*#__PURE__*/React.createElement("li", {
+      ref: measureRef,
+      role: "treeitem",
+      tabIndex: tabIndex,
+      "aria-expanded": isExpanded,
+      "aria-selected": isSelected || null,
+      "aria-level": level,
+      "aria-posinset": positionInSet,
+      "aria-setsize": setSize,
+      "data-index": index,
+      style: {
+        position: 'absolute',
+        top: 0,
+        transform: `translateY(${start}px)`,
+        '--level': level
+      },
+      onKeyDown: onKeyDown
+    }, isFn(renderLabel) ? renderLabel(props, {
+      isExpanded,
+      isExpandable: props.nodes.length > 0
+    }) : /*#__PURE__*/React.createElement("div", {
+      onClick: () => onItemSelect(props)
+    }, props.label));
   };
   /* istanbul ignore next */
 
 
   {
-    const getErrorForControlled = (propName, componentName, handlerName, defaultPropName) => {
-      return `You provided a \`${propName}\` prop to ${componentName} without an \`${handlerName}\` handler. ` + `This will cause the ${componentName} component to behave incorrectly. ` + `If the ${componentName} should be mutable use \`${defaultPropName}\` instead. Otherwise, set \`${handlerName}\`.`;
+    VirtualTreeItem.displayName = 'VirtualTreeItem';
+  }
+
+  const MemoVirtualTreeItem = /*#__PURE__*/react.memo(VirtualTreeItem, (prev, next) => // ignore object identity of these props
+  shallowEquals(prev, next, ['measureRef', 'onItemSelect', 'onKeyDown']));
+  var VirtualTreeItem$1 = MemoVirtualTreeItem;
+
+  /**
+   * An accessible tree view component, based on the WAI-ARIA authoring practices for accessible widgets.
+   *
+   * @see WAI-ARIA https://www.w3.org/TR/wai-aria-practices-1.2/#TreeView
+   */
+
+  const VirtualTree = _ref => {
+    let {
+      nodes,
+      defaultFocused,
+      focused: focusedProp,
+      onFocusChange = noop,
+      defaultExpanded = [],
+      expanded: expandedProp,
+      onExpandChange = noop,
+      selectionTogglesExpanded = true,
+      selectionFollowsFocus,
+      shouldFocusElementOnFocusedChange = true,
+      defaultSelected,
+      selected: selectedProp,
+      onSelectChange = noop,
+      renderLabel,
+      rowHeight = 30,
+      ...rest
+    } = _ref;
+    const initialFocus = isUndefined(focusedProp) ? isUndefined(defaultFocused) && nodes.length > 0 ? nodes[0].id : defaultFocused : undefined;
+    const [focused, setFocused] = useInternalState$1(focusedProp, initialFocus);
+    const [expanded, setExpanded] = useInternalState$1(expandedProp, defaultExpanded);
+    const [selected, setSelected] = useInternalState$1(selectedProp, defaultSelected);
+    const isMounted = react.useRef(false);
+    const parentRef = react.useRef();
+    const flattened = react.useMemo(() => flattenData(nodes, expanded), [nodes, expanded]);
+    const rowVirtualizer = reactVirtual.useVirtual({
+      estimateSize: react.useCallback(() => rowHeight, [rowHeight]),
+      size: flattened.length,
+      parentRef,
+
+      // prerender the focused item, the one before it, after it, the parent item of the focused one
+      rangeExtractor(range) {
+        const defaultRange = reactVirtual.defaultRangeExtractor(range);
+        const focusedIndex = flattened.findIndex(node => node.id === focused);
+
+        if (focusedIndex === -1) {
+          return defaultRange;
+        } else {
+          let range = new Set(defaultRange);
+          const node = flattened[focusedIndex];
+          const path = node[internalId].split('-');
+          const parent = path.length > 1 ? getNodeAt(nodes, path.slice(0, -1).join('-')) : null;
+
+          if (parent) {
+            range.add(flattened.findIndex(node => node.id === parent.id));
+          }
+
+          if (focusedIndex > 0) {
+            range.add(focusedIndex - 1);
+          }
+
+          range.add(focusedIndex);
+
+          if (focusedIndex < flattened.length - 1) {
+            range.add(focusedIndex + 1);
+          }
+
+          return [...range];
+        }
+      }
+
+    }); // @todo we should mimic the same API from Tree
+
+    react.useEffect(() => {
+      const hasMounted = isMounted.current;
+
+      if (!isMounted.current) {
+        isMounted.current = true;
+      }
+
+      if (hasMounted && shouldFocusElementOnFocusedChange) {
+        var _parentRef$current$qu;
+
+        const index = flattened.findIndex(node => node.id === focused);
+        const node = flattened[index];
+        rowVirtualizer.scrollToIndex(index);
+        (_parentRef$current$qu = parentRef.current.querySelector(`[data-index="${node[internalId]}"]`)) == null ? void 0 : _parentRef$current$qu.focus();
+      }
+    }, [focused]);
+
+    const focusTreeItem = node => {
+      if (node.id !== focused) {
+        setFocused(node.id);
+        onFocusChange(node);
+      }
+
+      if (selectionFollowsFocus) {
+        if (node.id !== selected) {
+          setSelected(node.id);
+          onSelectChange(node);
+        }
+      }
     };
 
-    const getErrorForUncontrolled = (propName, componentName, handlerName, defaultPropName) => {
-      return `You provided a \`${propName}\` prop as well as a \`${defaultPropName}\` prop to ${componentName}. ` + `If you want a controlled component, use the \`${propName}\` prop with an \`${handlerName}\` handler. ` + `If you want an uncontrolled component, remove the \`${propName}\` prop and use \`${defaultPropName}\` instead.`;
+    const onItemSelect = node => {
+      if (selectionTogglesExpanded && node.nodes.length > 0) {
+        setExpanded(prev => {
+          return prev.includes(node.id) ? prev.filter(id => id !== node.id) : prev.concat(node.id);
+        });
+        onExpandChange(node);
+      }
+
+      if (node.id !== focused) {
+        setFocused(node.id);
+        onFocusChange(node);
+      }
+
+      if (node.id !== selected) {
+        setSelected(node.id);
+        onSelectChange(node);
+      }
     };
 
-    const getGenericTypeError = (name, componentName, expectedType, value) => {
-      return `Invalid prop \`${name}\` supplied to ${componentName}. Expected \`${expectedType}\`, received \`${Array.isArray(value) ? 'array' : typeof value}\`.`;
+    const onKeyDown = e => {
+      /* istanbul ignore next we test this, but the code coverage tool is still unconvinced */
+      if (!nodes.length || e.altKey || e.ctrlKey || e.metaKey || e.target !== e.currentTarget) {
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (flattened[0].id !== focused) {
+          const index = flattened.findIndex(node => node.id === focused);
+          const nextIndex = index - 1;
+          const node = flattened[nextIndex];
+          focusTreeItem(node);
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (flattened[flattened.length - 1].id !== focused) {
+          const index = flattened.findIndex(node => node.id === focused);
+          const nextIndex = index + 1;
+          const node = flattened[nextIndex];
+          focusTreeItem(node);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        e.stopPropagation();
+        const {
+          isExpandable,
+          isExpanded
+        } = getExpandState(e.currentTarget);
+
+        if (isExpandable && isExpanded) {
+          const index = flattened.findIndex(node => node.id === focused);
+          const node = flattened[index];
+          setExpanded(prev => prev.filter(id => id !== node.id));
+          onExpandChange(node);
+          focusTreeItem(node);
+        } else {
+          const path = e.currentTarget.dataset.index.split('-');
+
+          if (path.length > 1) {
+            const parentNode = getNodeAt(nodes, path.slice(0, -1).join('-'));
+            const index = flattened.findIndex(node => node.id === parentNode.id);
+            const node = flattened[index]; // we do this, because parentNode doesn't have node[internalId]
+
+            focusTreeItem(node);
+          }
+        }
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        e.stopPropagation();
+        const {
+          isExpandable,
+          isExpanded
+        } = getExpandState(e.currentTarget);
+
+        if (isExpandable) {
+          if (isExpanded) {
+            const childNode = getNodeAt(nodes, e.currentTarget.dataset.index).nodes[0];
+            const index = flattened.findIndex(node => node.id === childNode.id);
+            const node = flattened[index]; // we do this, because childNode doesn't have node[internalId]
+
+            focusTreeItem(node);
+          } else {
+            const index = flattened.findIndex(node => node.id === focused);
+            const node = flattened[index];
+            setExpanded(prev => prev.concat(node.id));
+            onExpandChange(node);
+            focusTreeItem(node);
+          }
+        }
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        const node = getNodeAt(nodes, e.currentTarget.dataset.index);
+        onItemSelect(node);
+      }
     };
 
-    let nodeShape = {
-      id: PropTypes__default['default'].string.isRequired,
-      label: PropTypes__default['default'].oneOfType([PropTypes__default['default'].string, PropTypes__default['default'].node]).isRequired
-    };
-    nodeShape.nodes = PropTypes__default['default'].arrayOf(PropTypes__default['default'].shape(nodeShape));
-    Tree.displayName = 'Tree';
-    Tree.propTypes = {
-      nodes: PropTypes__default['default'].arrayOf(PropTypes__default['default'].shape(nodeShape)).isRequired,
-      defaultFocused: PropTypes__default['default'].string,
-      focused: (props, name, componentName) => {
-        const value = props[name];
-        const comp = `\`<${componentName}>\``;
+    const treeStyles = react.useMemo(() => {
+      return {
+        height: rowVirtualizer.totalSize + 'px',
+        position: 'relative',
+        margin: 0,
+        padding: 0
+      };
+    }, [rowVirtualizer.totalSize]);
+    return /*#__PURE__*/React.createElement("div", _extends({}, rest, {
+      ref: parentRef
+    }), /*#__PURE__*/React.createElement("ul", {
+      role: "tree",
+      style: treeStyles
+    }, rowVirtualizer.virtualItems.map(virtualRow => {
+      const node = flattened[virtualRow.index];
+      const path = node[internalId].split('-');
+      const level = path.length;
+      const positionInSet = parseInt(path[path.length - 1], 10) + 1;
+      const setSize = path.length === 1 ? nodes.length : getNodeAt(nodes, path.slice(0, -1).join('-')).nodes.length;
+      const isExpandable = node.nodes.length > 0;
+      const isExpanded = isExpandable ? expanded.includes(node.id) : null;
+      return /*#__PURE__*/React.createElement(VirtualTreeItem$1, _extends({}, node, {
+        key: virtualRow.index,
+        measureRef: virtualRow.measureRef,
+        start: virtualRow.start,
+        isExpanded: isExpanded,
+        isSelected: selected === node.id,
+        tabIndex: focused === node.id ? 0 : -1,
+        level: level,
+        positionInSet: positionInSet,
+        setSize: setSize,
+        index: node[internalId],
+        renderLabel: renderLabel,
+        onItemSelect: onItemSelect,
+        onKeyDown: onKeyDown
+      }));
+    })));
+  };
+  /* istanbul ignore next */
 
-        if (typeof value === 'string' && props.onFocusChange == null) {
-          return new Error(getErrorForControlled(name, comp, 'onFocusChange', 'defaultFocused'));
-        }
 
-        if (value != null && props.defaultFocused != null) {
-          return new Error(getErrorForUncontrolled(name, comp, 'onFocusChange', 'defaultFocused'));
-        }
-
-        if (value != null && typeof value !== 'string') {
-          return new Error(getGenericTypeError(name, comp, 'string', value));
-        }
-
-        return null;
-      },
-      onFocusChange: PropTypes__default['default'].func,
-      defaultExpanded: PropTypes__default['default'].arrayOf(PropTypes__default['default'].string),
-      expanded: (props, name, componentName) => {
-        const value = props[name];
-        const comp = `\`<${componentName}>\``;
-
-        if (Array.isArray(value) && props.onExpandChange == null) {
-          return new Error(getErrorForControlled(name, comp, 'onExpandChange', 'defaultExpanded'));
-        }
-
-        if (value != null && props.defaultExpanded != null) {
-          return new Error(getErrorForUncontrolled(name, comp, 'onExpandChange', 'defaultExpanded'));
-        }
-
-        if (Array.isArray(value)) {
-          const message = `You provided an array as \`${name}\` in ${comp} but one or more of the values are not string.`;
-          return value.some(i => typeof i !== 'string') ? new Error(message) : null;
-        }
-
-        if (value != null && !Array.isArray(value)) {
-          return new Error(getGenericTypeError(name, comp, 'array', value));
-        }
-
-        return null;
-      },
-      onExpandChange: PropTypes__default['default'].func,
-      defaultSelected: PropTypes__default['default'].string,
-      selected: (props, name, componentName, location) => {
-        const value = props[name];
-        const comp = `\`<${componentName}>\``;
-
-        if (typeof value === 'string' && props.onSelectChange == null) {
-          return new Error(getErrorForControlled(name, comp, 'onSelectChange', 'defaultSelected'));
-        }
-
-        if (value != null && props.defaultSelected != null) {
-          return new Error(getErrorForUncontrolled(name, comp, 'onSelectChange', 'defaultSelected'));
-        }
-
-        if (value != null && typeof value !== 'string') {
-          return new Error(getGenericTypeError(name, comp, 'string', value));
-        }
-
-        return null;
-      },
-      onSelectChange: PropTypes__default['default'].func,
-      renderLabel: PropTypes__default['default'].func
+  {
+    VirtualTree.displayName = 'VirtualTree';
+    VirtualTree.propTypes = { ...basePropTypes$1
     };
   }
 
-  var Tree$1 = /*#__PURE__*/React.memo(Tree);
+  var VirtualTree$1 = /*#__PURE__*/react.memo(VirtualTree);
 
-  return Tree$1;
+  exports.Tree = Tree$1;
+  exports.VirtualTree = VirtualTree$1;
 
-})));
+  Object.defineProperty(exports, '__esModule', { value: true });
+
+}));
