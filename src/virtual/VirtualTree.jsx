@@ -132,10 +132,8 @@ const VirtualTree = ({
             onFocusChange(node);
         }
 
-        if (node.id !== selected) {
-            setSelected(node.id);
-            onSelectChange(node);
-        }
+        setSelected(node.id);
+        onSelectChange(node);
     };
 
     const onKeyDown = (e) => {
