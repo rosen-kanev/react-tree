@@ -15,6 +15,8 @@ const VirtualTreeItem = ({
     setSize,
 
     index,
+    counter,
+    isFocused,
 
     renderLabel,
     onItemSelect,

@@ -1,4 +1,4 @@
-import { useEffect, memo, useRef, useCallback, useMemo } from 'react';
+import { forwardRef, useImperativeHandle, useState, useEffect, memo, useRef, useCallback, useMemo } from 'react';
 import { useVirtual, defaultRangeExtractor } from 'react-virtual';
 import PropTypes from 'prop-types';
 
@@ -13,28 +13,30 @@ import basePropTypes from '../basePropTypes.js';
  *
  * @see WAI-ARIA https://www.w3.org/TR/wai-aria-practices-1.2/#TreeView
  */
-const VirtualTree = ({
-    nodes,
+const VirtualTreeImpl = (
+    {
+        nodes,
 
-    defaultFocused,
-    focused: focusedProp,
-    onFocusChange = noop,
+        defaultFocused,
+        focused: focusedProp,
+        onFocusChange = noop,
 
-    defaultExpanded = [],
-    expanded: expandedProp,
-    onExpandChange = noop,
+        defaultExpanded = [],
+        expanded: expandedProp,
+        onExpandChange = noop,
 
-    selectionTogglesExpanded = true,
-    selectionFollowsFocus,
-    shouldFocusElementOnFocusedChange = true,
-    defaultSelected,
-    selected: selectedProp,
-    onSelectChange = noop,
+        selectionTogglesExpanded = true,
+        selectionFollowsFocus,
+        defaultSelected,
+        selected: selectedProp,
+        onSelectChange = noop,
 
-    renderLabel,
-    rowHeight = 30,
-    ...rest
-}) => {
+        renderLabel,
+        rowHeight = 30,
+        ...rest
+    },
+    ref
+) => {
     const initialFocus = isUndefined(focusedProp)
         ? isUndefined(defaultFocused) && nodes.length > 0
             ? nodes[0].id
@@ -45,7 +47,6 @@ const VirtualTree = ({
     const [expanded, setExpanded] = useInternalState(expandedProp, defaultExpanded);
     const [selected, setSelected] = useInternalState(selectedProp, defaultSelected);
 
-    const isMounted = useRef(false);
     const parentRef = useRef();
     const flattened = useMemo(() => flattenData(nodes, expanded), [nodes, expanded]);
 
@@ -88,36 +89,31 @@ const VirtualTree = ({
         },
     });
 
-    // @todo we should mimic the same API from Tree
+    // hacky way to signal the currently `focused` TreeItem to call el.focus()
+    // this is mostly done to allow users of the component to call `.focus()` from the imperative handle
+    const [counter, setCounter] = useState(0);
+
     useEffect(() => {
-        const hasMounted = isMounted.current;
-
-        if (!isMounted.current) {
-            isMounted.current = true;
-        }
-
-        if (hasMounted && shouldFocusElementOnFocusedChange) {
+        if (counter > 0) {
             const index = flattened.findIndex((node) => node.id === focused);
             const node = flattened[index];
+            const el = parentRef.current.querySelector(`[data-index="${node[internalId]}"]`);
 
             rowVirtualizer.scrollToIndex(index);
-            parentRef.current.querySelector(`[data-index="${node[internalId]}"]`)?.focus();
-        }
-    }, [focused]);
 
-    const focusTreeItem = (node) => {
-        if (node.id !== focused) {
-            setFocused(node.id);
-            onFocusChange(node);
-        }
-
-        if (selectionFollowsFocus) {
-            if (node.id !== selected) {
-                setSelected(node.id);
-                onSelectChange(node);
+            if (el) {
+                el.focus();
             }
         }
-    };
+    }, [counter]);
+
+    useImperativeHandle(ref, () => {
+        return {
+            focus() {
+                setCounter((prev) => prev + 1);
+            },
+        };
+    });
 
     const onItemSelect = (node) => {
         if (selectionTogglesExpanded && node.nodes.length > 0) {
@@ -223,6 +219,19 @@ const VirtualTree = ({
         }
     };
 
+    const focusTreeItem = (node) => {
+        if (node.id !== focused) {
+            setCounter((prev) => prev + 1);
+            setFocused(node.id);
+            onFocusChange(node);
+        }
+
+        if (selectionFollowsFocus) {
+            setSelected(node.id);
+            onSelectChange(node);
+        }
+    };
+
     const treeStyles = useMemo(() => {
         return {
             height: rowVirtualizer.totalSize + 'px',
@@ -271,6 +280,8 @@ const VirtualTree = ({
         </div>
     );
 };
+
+const VirtualTree = forwardRef(VirtualTreeImpl);
 
 /* istanbul ignore next */
 if (process.env.NODE_ENV !== 'production') {

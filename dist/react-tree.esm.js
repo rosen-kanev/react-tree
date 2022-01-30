@@ -195,6 +195,7 @@ const shallowEquals = (prev, next, ignored) => {
 
   for (const key of keysPrev) {
     if (!Object.prototype.hasOwnProperty.call(next, key) || !Object.is(prev[key], next[key])) {
+      // console.log(key, 'changed', prev[key], next[key]);
       return false;
     }
   }
@@ -577,7 +578,10 @@ const TreeImpl = (_ref, ref) => {
 
     setSelected(node.id);
     onSelectChange(node);
-  };
+  }; // @todo should we pass node={node}?
+  // currently index, selected, focused, etc... are preventing users from
+  // using the same properties in a node
+
 
   return /*#__PURE__*/jsx("ul", {
     role: "tree",
@@ -619,6 +623,8 @@ const VirtualTreeItem = _ref => {
     positionInSet,
     setSize,
     index,
+    counter,
+    isFocused,
     renderLabel,
     onItemSelect,
     onKeyDown,
@@ -661,7 +667,7 @@ const MemoVirtualTreeItem = /*#__PURE__*/memo(VirtualTreeItem, (prev, next) => /
 shallowEquals(prev, next, ['measureRef', 'onItemSelect', 'onKeyDown']));
 var VirtualTreeItem$1 = MemoVirtualTreeItem;
 
-const VirtualTree = _ref => {
+const VirtualTreeImpl = (_ref, ref) => {
   let {
     nodes,
     defaultFocused,
@@ -672,7 +678,6 @@ const VirtualTree = _ref => {
     onExpandChange = noop,
     selectionTogglesExpanded = true,
     selectionFollowsFocus,
-    shouldFocusElementOnFocusedChange = true,
     defaultSelected,
     selected: selectedProp,
     onSelectChange = noop,
@@ -684,7 +689,6 @@ const VirtualTree = _ref => {
   const [focused, setFocused] = useInternalState$1(focusedProp, initialFocus);
   const [expanded, setExpanded] = useInternalState$1(expandedProp, defaultExpanded);
   const [selected, setSelected] = useInternalState$1(selectedProp, defaultSelected);
-  const isMounted = useRef(false);
   const parentRef = useRef();
   const flattened = useMemo(() => flattenData(nodes, expanded), [nodes, expanded]);
   const rowVirtualizer = useVirtual({
@@ -723,38 +727,30 @@ const VirtualTree = _ref => {
       }
     }
 
-  }); // @todo we should mimic the same API from Tree
+  }); // hacky way to signal the currently `focused` TreeItem to call el.focus()
+  // this is mostly done to allow users of the component to call `.focus()` from the imperative handle
 
+  const [counter, setCounter] = useState(0);
   useEffect(() => {
-    const hasMounted = isMounted.current;
-
-    if (!isMounted.current) {
-      isMounted.current = true;
-    }
-
-    if (hasMounted && shouldFocusElementOnFocusedChange) {
-      var _parentRef$current$qu;
-
+    if (counter > 0) {
       const index = flattened.findIndex(node => node.id === focused);
       const node = flattened[index];
+      const el = parentRef.current.querySelector(`[data-index="${node[internalId]}"]`);
       rowVirtualizer.scrollToIndex(index);
-      (_parentRef$current$qu = parentRef.current.querySelector(`[data-index="${node[internalId]}"]`)) == null ? void 0 : _parentRef$current$qu.focus();
-    }
-  }, [focused]);
 
-  const focusTreeItem = node => {
-    if (node.id !== focused) {
-      setFocused(node.id);
-      onFocusChange(node);
-    }
-
-    if (selectionFollowsFocus) {
-      if (node.id !== selected) {
-        setSelected(node.id);
-        onSelectChange(node);
+      if (el) {
+        el.focus();
       }
     }
-  };
+  }, [counter]);
+  useImperativeHandle(ref, () => {
+    return {
+      focus() {
+        setCounter(prev => prev + 1);
+      }
+
+    };
+  });
 
   const onItemSelect = node => {
     if (selectionTogglesExpanded && node.nodes.length > 0) {
@@ -769,10 +765,8 @@ const VirtualTree = _ref => {
       onFocusChange(node);
     }
 
-    if (node.id !== selected) {
-      setSelected(node.id);
-      onSelectChange(node);
-    }
+    setSelected(node.id);
+    onSelectChange(node);
   };
 
   const onKeyDown = e => {
@@ -857,6 +851,19 @@ const VirtualTree = _ref => {
     }
   };
 
+  const focusTreeItem = node => {
+    if (node.id !== focused) {
+      setCounter(prev => prev + 1);
+      setFocused(node.id);
+      onFocusChange(node);
+    }
+
+    if (selectionFollowsFocus) {
+      setSelected(node.id);
+      onSelectChange(node);
+    }
+  };
+
   const treeStyles = useMemo(() => {
     return {
       height: rowVirtualizer.totalSize + 'px',
@@ -897,8 +904,9 @@ const VirtualTree = _ref => {
     })
   });
 };
-/* istanbul ignore next */
 
+const VirtualTree = /*#__PURE__*/forwardRef(VirtualTreeImpl);
+/* istanbul ignore next */
 
 if (process.env.NODE_ENV !== 'production') {
   VirtualTree.displayName = 'VirtualTree';

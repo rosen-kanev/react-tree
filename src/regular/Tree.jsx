@@ -143,6 +143,9 @@ const TreeImpl = (
         onSelectChange(node);
     };
 
+    // @todo should we pass node={node}?
+    // currently index, selected, focused, etc... are preventing users from
+    // using the same properties in a node
     return (
         <ul role="tree" {...rest}>
             {nodes.map((node, index) => (
