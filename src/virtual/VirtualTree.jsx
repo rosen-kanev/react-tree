@@ -259,8 +259,8 @@ const VirtualTreeImpl = (
 
                     return (
                         <VirtualTreeItem
-                            {...node}
                             key={virtualRow.index}
+                            node={node}
                             measureRef={virtualRow.measureRef}
                             start={virtualRow.start}
                             isExpanded={isExpanded}

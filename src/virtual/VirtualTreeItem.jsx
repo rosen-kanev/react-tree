@@ -3,6 +3,8 @@ import { memo } from 'react';
 import { isFn, shallowEquals } from '../utils';
 
 const VirtualTreeItem = ({
+    node,
+
     measureRef,
     start,
 
@@ -21,8 +23,6 @@ const VirtualTreeItem = ({
     renderLabel,
     onItemSelect,
     onKeyDown,
-
-    ...props
 }) => {
     return (
         <li
@@ -44,9 +44,9 @@ const VirtualTreeItem = ({
             onKeyDown={onKeyDown}
         >
             {isFn(renderLabel) ? (
-                renderLabel(props, { isExpanded, isExpandable: props.nodes.length > 0 })
+                renderLabel(node, { isExpanded, isExpandable: node.nodes.length > 0 })
             ) : (
-                <div onClick={() => onItemSelect(props)}>{props.label}</div>
+                <div onClick={() => onItemSelect(node)}>{node.label}</div>
             )}
         </li>
     );

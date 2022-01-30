@@ -48,7 +48,7 @@ const App = () => {
 
     return (
         <>
-            {false && (
+            {true && (
                 <VirtualTree
                     className="virtual"
                     nodes={nodes}
@@ -61,7 +61,7 @@ const App = () => {
                     renderLabel={renderLabel}
                 />
             )}
-            {true && (
+            {false && (
                 <Tree
                     className="vanilla"
                     nodes={nodes}

@@ -218,7 +218,6 @@
 
     for (const key of keysPrev) {
       if (!Object.prototype.hasOwnProperty.call(next, key) || !Object.is(prev[key], next[key])) {
-        // console.log(key, 'changed', prev[key], next[key]);
         return false;
       }
     }
@@ -257,24 +256,24 @@
 
   const TreeItem = _ref => {
     let {
-      onItemSelect,
-      renderLabel,
-      focused,
-      selected,
-      expanded,
+      node,
       index,
+      selected,
+      focused,
+      expanded,
       setSize,
       counter,
-      onKeyDown,
-      ...props
+      onItemSelect,
+      renderLabel,
+      onKeyDown
     } = _ref;
-    const isExpandable = props.nodes.length > 0;
-    const isExpanded = isExpandable ? expanded.includes(props.id) : null;
+    const isExpandable = node.nodes.length > 0;
+    const isExpanded = isExpandable ? expanded.includes(node.id) : null;
     const path = index.split('-');
     const positionInSet = parseInt(path[path.length - 1], 10) + 1;
     const el = react.useRef();
     react.useEffect(() => {
-      if (counter > 0 && focused === props.id) {
+      if (counter > 0 && focused === node.id) {
         if (el.current) {
           el.current.focus();
           el.current.firstElementChild.scrollIntoView({
@@ -286,33 +285,34 @@
     return /*#__PURE__*/React.createElement("li", {
       ref: el,
       role: "treeitem",
-      tabIndex: focused === props.id ? 0 : -1,
+      tabIndex: focused === node.id ? 0 : -1,
       "aria-expanded": isExpanded,
-      "aria-selected": selected === props.id || null,
+      "aria-selected": selected === node.id || null,
       "aria-level": path.length,
       "aria-posinset": positionInSet,
       "aria-setsize": setSize,
       "data-index": index,
       onKeyDown: onKeyDown
-    }, isFn(renderLabel) ? renderLabel(props, {
+    }, isFn(renderLabel) ? renderLabel(node, {
       isExpandable,
       isExpanded
     }) : /*#__PURE__*/React.createElement("div", {
-      onClick: () => onItemSelect(props)
-    }, props.label), isExpanded && isExpandable && /*#__PURE__*/React.createElement("ul", {
+      onClick: () => onItemSelect(node)
+    }, node.label), isExpanded && isExpandable && /*#__PURE__*/React.createElement("ul", {
       role: "group"
-    }, props.nodes.map((node, childIndex) => /*#__PURE__*/React.createElement(MemoTreeItem, _extends({}, node, {
+    }, node.nodes.map((node, childIndex) => /*#__PURE__*/React.createElement(MemoTreeItem, {
       key: node.id,
+      node: node,
       index: index + '-' + childIndex,
       selected: selected,
       focused: focused,
       expanded: expanded,
-      setSize: props.nodes.length,
+      setSize: node.nodes.length,
       counter: counter,
       renderLabel: renderLabel,
       onItemSelect: onItemSelect,
       onKeyDown: onKeyDown
-    })))));
+    }))));
   };
   /* istanbul ignore next */
 
@@ -333,9 +333,9 @@
     // and most of the tree changes will be happening near the root of the tree
 
 
-    const stack = [{ ...next,
+    const stack = [{ ...next.node,
       nodes: []
-    }, ...next.nodes];
+    }, ...next.node.nodes];
 
     while (stack.length) {
       const node = stack.shift();
@@ -604,15 +604,13 @@
 
       setSelected(node.id);
       onSelectChange(node);
-    }; // @todo should we pass node={node}?
-    // currently index, selected, focused, etc... are preventing users from
-    // using the same properties in a node
-
+    };
 
     return /*#__PURE__*/React.createElement("ul", _extends({
       role: "tree"
-    }, rest), nodes.map((node, index) => /*#__PURE__*/React.createElement(TreeItem$1, _extends({}, node, {
+    }, rest), nodes.map((node, index) => /*#__PURE__*/React.createElement(TreeItem$1, {
       key: node.id,
+      node: node,
       index: `${index}`,
       selected: selected,
       focused: focused,
@@ -622,7 +620,7 @@
       renderLabel: renderLabel,
       onItemSelect: onItemSelect,
       onKeyDown: onKeyDown
-    }))));
+    })));
   };
 
   const Tree = /*#__PURE__*/react.forwardRef(TreeImpl);
@@ -638,6 +636,7 @@
 
   const VirtualTreeItem = _ref => {
     let {
+      node,
       measureRef,
       start,
       isExpanded,
@@ -651,8 +650,7 @@
       isFocused,
       renderLabel,
       onItemSelect,
-      onKeyDown,
-      ...props
+      onKeyDown
     } = _ref;
     return /*#__PURE__*/React.createElement("li", {
       ref: measureRef,
@@ -671,12 +669,12 @@
         '--level': level
       },
       onKeyDown: onKeyDown
-    }, isFn(renderLabel) ? renderLabel(props, {
+    }, isFn(renderLabel) ? renderLabel(node, {
       isExpanded,
-      isExpandable: props.nodes.length > 0
+      isExpandable: node.nodes.length > 0
     }) : /*#__PURE__*/React.createElement("div", {
-      onClick: () => onItemSelect(props)
-    }, props.label));
+      onClick: () => onItemSelect(node)
+    }, node.label));
   };
   /* istanbul ignore next */
 
@@ -913,8 +911,9 @@
       const setSize = path.length === 1 ? nodes.length : getNodeAt(nodes, path.slice(0, -1).join('-')).nodes.length;
       const isExpandable = node.nodes.length > 0;
       const isExpanded = isExpandable ? expanded.includes(node.id) : null;
-      return /*#__PURE__*/React.createElement(VirtualTreeItem$1, _extends({}, node, {
+      return /*#__PURE__*/React.createElement(VirtualTreeItem$1, {
         key: virtualRow.index,
+        node: node,
         measureRef: virtualRow.measureRef,
         start: virtualRow.start,
         isExpanded: isExpanded,
@@ -927,7 +926,7 @@
         renderLabel: renderLabel,
         onItemSelect: onItemSelect,
         onKeyDown: onKeyDown
-      }));
+      });
     })));
   };
 

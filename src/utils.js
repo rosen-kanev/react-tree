@@ -187,7 +187,6 @@ export const shallowEquals = (prev, next, ignored) => {
 
     for (const key of keysPrev) {
         if (!Object.prototype.hasOwnProperty.call(next, key) || !Object.is(prev[key], next[key])) {
-            // console.log(key, 'changed', prev[key], next[key]);
             return false;
         }
     }

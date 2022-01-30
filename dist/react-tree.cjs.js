@@ -203,7 +203,6 @@ const shallowEquals = (prev, next, ignored) => {
 
   for (const key of keysPrev) {
     if (!Object.prototype.hasOwnProperty.call(next, key) || !Object.is(prev[key], next[key])) {
-      // console.log(key, 'changed', prev[key], next[key]);
       return false;
     }
   }
@@ -242,24 +241,24 @@ const flattenData = (nodes, expanded) => {
 
 const TreeItem = _ref => {
   let {
-    onItemSelect,
-    renderLabel,
-    focused,
-    selected,
-    expanded,
+    node,
     index,
+    selected,
+    focused,
+    expanded,
     setSize,
     counter,
-    onKeyDown,
-    ...props
+    onItemSelect,
+    renderLabel,
+    onKeyDown
   } = _ref;
-  const isExpandable = props.nodes.length > 0;
-  const isExpanded = isExpandable ? expanded.includes(props.id) : null;
+  const isExpandable = node.nodes.length > 0;
+  const isExpanded = isExpandable ? expanded.includes(node.id) : null;
   const path = index.split('-');
   const positionInSet = parseInt(path[path.length - 1], 10) + 1;
   const el = react.useRef();
   react.useEffect(() => {
-    if (counter > 0 && focused === props.id) {
+    if (counter > 0 && focused === node.id) {
       if (el.current) {
         el.current.focus();
         el.current.firstElementChild.scrollIntoView({
@@ -271,34 +270,34 @@ const TreeItem = _ref => {
   return /*#__PURE__*/jsxRuntime.jsxs("li", {
     ref: el,
     role: "treeitem",
-    tabIndex: focused === props.id ? 0 : -1,
+    tabIndex: focused === node.id ? 0 : -1,
     "aria-expanded": isExpanded,
-    "aria-selected": selected === props.id || null,
+    "aria-selected": selected === node.id || null,
     "aria-level": path.length,
     "aria-posinset": positionInSet,
     "aria-setsize": setSize,
     "data-index": index,
     onKeyDown: onKeyDown,
-    children: [isFn(renderLabel) ? renderLabel(props, {
+    children: [isFn(renderLabel) ? renderLabel(node, {
       isExpandable,
       isExpanded
     }) : /*#__PURE__*/jsxRuntime.jsx("div", {
-      onClick: () => onItemSelect(props),
-      children: props.label
+      onClick: () => onItemSelect(node),
+      children: node.label
     }), isExpanded && isExpandable && /*#__PURE__*/jsxRuntime.jsx("ul", {
       role: "group",
-      children: props.nodes.map((node, childIndex) => /*#__PURE__*/react.createElement(MemoTreeItem, { ...node,
-        key: node.id,
+      children: node.nodes.map((node, childIndex) => /*#__PURE__*/jsxRuntime.jsx(MemoTreeItem, {
+        node: node,
         index: index + '-' + childIndex,
         selected: selected,
         focused: focused,
         expanded: expanded,
-        setSize: props.nodes.length,
+        setSize: node.nodes.length,
         counter: counter,
         renderLabel: renderLabel,
         onItemSelect: onItemSelect,
         onKeyDown: onKeyDown
-      }))
+      }, node.id))
     })]
   });
 };
@@ -321,9 +320,9 @@ const propsAreEqual = (prev, next) => {
   // and most of the tree changes will be happening near the root of the tree
 
 
-  const stack = [{ ...next,
+  const stack = [{ ...next.node,
     nodes: []
-  }, ...next.nodes];
+  }, ...next.node.nodes];
 
   while (stack.length) {
     const node = stack.shift();
@@ -586,16 +585,13 @@ const TreeImpl = (_ref, ref) => {
 
     setSelected(node.id);
     onSelectChange(node);
-  }; // @todo should we pass node={node}?
-  // currently index, selected, focused, etc... are preventing users from
-  // using the same properties in a node
-
+  };
 
   return /*#__PURE__*/jsxRuntime.jsx("ul", {
     role: "tree",
     ...rest,
-    children: nodes.map((node, index) => /*#__PURE__*/react.createElement(TreeItem$1, { ...node,
-      key: node.id,
+    children: nodes.map((node, index) => /*#__PURE__*/jsxRuntime.jsx(TreeItem$1, {
+      node: node,
       index: `${index}`,
       selected: selected,
       focused: focused,
@@ -605,7 +601,7 @@ const TreeImpl = (_ref, ref) => {
       renderLabel: renderLabel,
       onItemSelect: onItemSelect,
       onKeyDown: onKeyDown
-    }))
+    }, node.id))
   });
 };
 
@@ -622,6 +618,7 @@ var Tree$1 = /*#__PURE__*/react.memo(Tree);
 
 const VirtualTreeItem = _ref => {
   let {
+    node,
     measureRef,
     start,
     isExpanded,
@@ -635,8 +632,7 @@ const VirtualTreeItem = _ref => {
     isFocused,
     renderLabel,
     onItemSelect,
-    onKeyDown,
-    ...props
+    onKeyDown
   } = _ref;
   return /*#__PURE__*/jsxRuntime.jsx("li", {
     ref: measureRef,
@@ -655,12 +651,12 @@ const VirtualTreeItem = _ref => {
       '--level': level
     },
     onKeyDown: onKeyDown,
-    children: isFn(renderLabel) ? renderLabel(props, {
+    children: isFn(renderLabel) ? renderLabel(node, {
       isExpanded,
-      isExpandable: props.nodes.length > 0
+      isExpandable: node.nodes.length > 0
     }) : /*#__PURE__*/jsxRuntime.jsx("div", {
-      onClick: () => onItemSelect(props),
-      children: props.label
+      onClick: () => onItemSelect(node),
+      children: node.label
     })
   });
 };
@@ -893,8 +889,8 @@ const VirtualTreeImpl = (_ref, ref) => {
         const setSize = path.length === 1 ? nodes.length : getNodeAt(nodes, path.slice(0, -1).join('-')).nodes.length;
         const isExpandable = node.nodes.length > 0;
         const isExpanded = isExpandable ? expanded.includes(node.id) : null;
-        return /*#__PURE__*/react.createElement(VirtualTreeItem$1, { ...node,
-          key: virtualRow.index,
+        return /*#__PURE__*/jsxRuntime.jsx(VirtualTreeItem$1, {
+          node: node,
           measureRef: virtualRow.measureRef,
           start: virtualRow.start,
           isExpanded: isExpanded,
@@ -907,7 +903,7 @@ const VirtualTreeImpl = (_ref, ref) => {
           renderLabel: renderLabel,
           onItemSelect: onItemSelect,
           onKeyDown: onKeyDown
-        });
+        }, virtualRow.index);
       })
     })
   });

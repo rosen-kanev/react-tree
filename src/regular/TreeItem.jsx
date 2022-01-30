@@ -3,19 +3,19 @@ import { useRef, useEffect, memo } from 'react';
 import { isFn, shallowEquals } from '../utils';
 
 const TreeItem = ({
-    onItemSelect,
-    renderLabel,
-    focused,
-    selected,
-    expanded,
+    node,
     index,
+    selected,
+    focused,
+    expanded,
     setSize,
     counter,
+    onItemSelect,
+    renderLabel,
     onKeyDown,
-    ...props
 }) => {
-    const isExpandable = props.nodes.length > 0;
-    const isExpanded = isExpandable ? expanded.includes(props.id) : null;
+    const isExpandable = node.nodes.length > 0;
+    const isExpanded = isExpandable ? expanded.includes(node.id) : null;
 
     const path = index.split('-');
     const positionInSet = parseInt(path[path.length - 1], 10) + 1;
@@ -23,7 +23,7 @@ const TreeItem = ({
     const el = useRef();
 
     useEffect(() => {
-        if (counter > 0 && focused === props.id) {
+        if (counter > 0 && focused === node.id) {
             if (el.current) {
                 el.current.focus();
                 el.current.firstElementChild.scrollIntoView({ block: 'nearest' });
@@ -35,9 +35,9 @@ const TreeItem = ({
         <li
             ref={el}
             role="treeitem"
-            tabIndex={focused === props.id ? 0 : -1}
+            tabIndex={focused === node.id ? 0 : -1}
             aria-expanded={isExpanded}
-            aria-selected={selected === props.id || null}
+            aria-selected={selected === node.id || null}
             aria-level={path.length}
             aria-posinset={positionInSet}
             aria-setsize={setSize}
@@ -45,22 +45,22 @@ const TreeItem = ({
             onKeyDown={onKeyDown}
         >
             {isFn(renderLabel) ? (
-                renderLabel(props, { isExpandable, isExpanded })
+                renderLabel(node, { isExpandable, isExpanded })
             ) : (
-                <div onClick={() => onItemSelect(props)}>{props.label}</div>
+                <div onClick={() => onItemSelect(node)}>{node.label}</div>
             )}
 
             {isExpanded && isExpandable && (
                 <ul role="group">
-                    {props.nodes.map((node, childIndex) => (
+                    {node.nodes.map((node, childIndex) => (
                         <MemoTreeItem
-                            {...node}
                             key={node.id}
+                            node={node}
                             index={index + '-' + childIndex}
                             selected={selected}
                             focused={focused}
                             expanded={expanded}
-                            setSize={props.nodes.length}
+                            setSize={node.nodes.length}
                             counter={counter}
                             renderLabel={renderLabel}
                             onItemSelect={onItemSelect}
@@ -90,7 +90,7 @@ const propsAreEqual = (prev, next) => {
 
     // breadth first traverse - when working with file system like trees the user usually starts from the outer nodes
     // and most of the tree changes will be happening near the root of the tree
-    const stack = [{ ...next, nodes: [] }, ...next.nodes];
+    const stack = [{ ...next.node, nodes: [] }, ...next.node.nodes];
 
     while (stack.length) {
         const node = stack.shift();
