@@ -5,7 +5,16 @@ import PropTypes from 'prop-types';
 import VirtualTreeItem from './VirtualTreeItem.jsx';
 
 import useInternalState from '../useInternalState.js';
-import { internalId, flattenData, getExpandState, getNodeAt, noop, isUndefined, isFn } from '../utils.js';
+import {
+    internalId,
+    flattenData,
+    getExpandState,
+    getParentNode,
+    getNodeAt,
+    noop,
+    isUndefined,
+    isFn,
+} from '../utils.js';
 import basePropTypes from '../basePropTypes.js';
 
 /**
@@ -67,8 +76,7 @@ const VirtualTreeImpl = (
                 let range = new Set(defaultRange);
 
                 const node = flattened[focusedIndex];
-                const path = node[internalId].split('-');
-                const parent = path.length > 1 ? getNodeAt(nodes, path.slice(0, -1).join('-')) : null;
+                const parent = getParentNode(nodes, node[internalId]);
 
                 if (parent) {
                     range.add(flattened.findIndex((node) => node.id === parent.id));
@@ -140,7 +148,6 @@ const VirtualTreeImpl = (
 
         if (e.key === 'ArrowUp') {
             e.preventDefault();
-            e.stopPropagation();
 
             if (flattened[0].id !== focused) {
                 const index = flattened.findIndex((node) => node.id === focused);
@@ -151,7 +158,6 @@ const VirtualTreeImpl = (
             }
         } else if (e.key === 'ArrowDown') {
             e.preventDefault();
-            e.stopPropagation();
 
             if (flattened[flattened.length - 1].id !== focused) {
                 const index = flattened.findIndex((node) => node.id === focused);
@@ -162,7 +168,6 @@ const VirtualTreeImpl = (
             }
         } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
-            e.stopPropagation();
 
             const { isExpandable, isExpanded } = getExpandState(e.currentTarget);
 
@@ -175,10 +180,9 @@ const VirtualTreeImpl = (
 
                 focusTreeItem(node);
             } else {
-                const path = e.currentTarget.dataset.index.split('-');
+                const parentNode = getParentNode(nodes, e.currentTarget.dataset.index);
 
-                if (path.length > 1) {
-                    const parentNode = getNodeAt(nodes, path.slice(0, -1).join('-'));
+                if (parentNode) {
                     const index = flattened.findIndex((node) => node.id === parentNode.id);
                     const node = flattened[index]; // we do this, because parentNode doesn't have node[internalId]
 
@@ -187,7 +191,6 @@ const VirtualTreeImpl = (
             }
         } else if (e.key === 'ArrowRight') {
             e.preventDefault();
-            e.stopPropagation();
 
             const { isExpandable, isExpanded } = getExpandState(e.currentTarget);
 
@@ -211,7 +214,6 @@ const VirtualTreeImpl = (
             }
         } else if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            e.stopPropagation();
 
             const node = getNodeAt(nodes, e.currentTarget.dataset.index);
 
@@ -224,11 +226,11 @@ const VirtualTreeImpl = (
             setCounter((prev) => prev + 1);
             setFocused(node.id);
             onFocusChange(node);
-        }
 
-        if (selectionFollowsFocus) {
-            setSelected(node.id);
-            onSelectChange(node);
+            if (selectionFollowsFocus) {
+                setSelected(node.id);
+                onSelectChange(node);
+            }
         }
     };
 
@@ -252,7 +254,7 @@ const VirtualTreeImpl = (
                     const level = path.length;
                     const positionInSet = parseInt(path[path.length - 1], 10) + 1;
                     const setSize =
-                        path.length === 1 ? nodes.length : getNodeAt(nodes, path.slice(0, -1).join('-')).nodes.length;
+                        path.length === 1 ? nodes.length : getParentNode(nodes, node[internalId]).nodes.length;
 
                     const isExpandable = node.nodes.length > 0;
                     const isExpanded = isExpandable ? expanded.includes(node.id) : null;

@@ -52,10 +52,10 @@ const TreeItem = ({
 
             {isExpanded && isExpandable && (
                 <ul role="group">
-                    {node.nodes.map((node, childIndex) => (
+                    {node.nodes.map((n, childIndex) => (
                         <MemoTreeItem
-                            key={node.id}
-                            node={node}
+                            key={n.id}
+                            node={n}
                             index={index + '-' + childIndex}
                             selected={selected}
                             focused={focused}

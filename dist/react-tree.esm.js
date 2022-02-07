@@ -19,168 +19,21 @@ const getNodeAt = (nodes, index) => {
 
   return i && i === path.length ? node : undefined;
 };
-const moveUp = (current, nodes) => {
-  if (current.dataset.index === '0') {
-    // we are at the start of the tree
-    return [null, null];
-  }
-
-  if (current.previousElementSibling) {
-    // move back a node and find the deepest leaf node
-    let item = current.previousElementSibling;
-
-    while (true) {
-      const {
-        isExpanded,
-        isExpandable
-      } = getExpandState(item);
-
-      if (isExpandable && isExpanded) {
-        // ├─ node_modules
-        // │  └─ @babel
-        // │     ├─ code-frame
-        // │     └─ compat-data (next)
-        // ├─ src (current)
-        item = item.lastElementChild.lastElementChild;
-      } else {
-        break;
-      }
-    }
-
-    return [item, getNodeAt(nodes, item.dataset.index)];
-  } else {
-    // ├─ node_modules
-    // │  └─ @babel (next)
-    // │     ├─ code-frame (current)
-    // │     └─ compat-data
-    return moveToParent(current, nodes);
-  }
+const getParentNode = (nodes, index) => {
+  const path = index.split('-');
+  return path.length > 1 ? getNodeAt(nodes, path.slice(0, -1).join('-')) : null;
 };
-const moveDown = (current, nodes) => {
-  let item = current;
-  const {
-    isExpanded
-  } = getExpandState(current);
-
-  if (isExpanded) {
-    // ├─ node_modules (current)
-    // │  └─ @babel (next)
-    // │     ├─ code-frame
-    // │     └─ compat-data
-    // ├─ src
-    item = current.lastElementChild.firstElementChild;
-  } else {
-    // go to parent and find its next sibling until we find a node or reach the end of the tree
-    // ├─ node_modules
-    // │  └─ @babel
-    // │     ├─ code-frame
-    // │     └─ compat-data (current)
-    // ├─ src (next)
-    while (true) {
-      // ├─ node_modules
-      // │  └─ @babel
-      // │     ├─ code-frame
-      // │     └─ compat-data (current)
-      if (isLastItem(item, nodes)) {
-        // we are at the end of the tree
-        return [null, null];
-      }
-
-      if (item.nextElementSibling) {
-        item = item.nextElementSibling;
-        break;
-      }
-
-      item = item.parentElement.parentElement;
-    }
-  }
-
-  return [item, getNodeAt(nodes, item.dataset.index)];
-};
-const moveLeft = (current, nodes) => {
-  const {
-    isExpandable,
-    isExpanded
-  } = getExpandState(current);
-  const index = current.dataset.index;
-
-  if (isExpandable && isExpanded) {
-    // ├─ src (current)
-    // │ ├─ App.jsx
-    // │ └─ data.js       -> ├─ src (next)
-    // ├─ .editorconfig      ├─ .editorconfig
-    // └─ .gitignore.js      └─ .gitignore.js
-    return [null, getNodeAt(nodes, index)];
-  } else {
-    // ├─ src (next)
-    // │ ├─ App.jsx
-    // │ └─ data.js (current)
-    // ├─ .editorconfig
-    // └─ .gitignore.js
-    return moveToParent(current, nodes);
-  }
-};
-const moveRight = (current, nodes) => {
-  const {
-    isExpandable,
-    isExpanded
-  } = getExpandState(current);
-
-  if (isExpandable) {
-    const index = current.dataset.index;
-    const node = getNodeAt(nodes, index);
-
-    if (isExpanded) {
-      // ├─ src (current)
-      // │ ├─ App.jsx (next)
-      // │ └─ data.js
-      // ├─ .editorconfig
-      // └─ .gitignore.js
-      const item = current.lastElementChild.firstElementChild;
-      const next = node.nodes[0];
-      return [item, next];
-    } else {
-      // ├─ src (current)      ├─ src (next)
-      // ├─ .editorconfig      │ ├─ App.jsx
-      // └─ .gitignore.js   -> │ └─ data.js
-      //                       ├─ .editorconfig
-      //                       └─ .gitignore.js
-      return [null, node];
-    }
-  } // ├─ src
-  // │ ├─ App.jsx
-  // │ └─ data.js
-  // ├─ .editorconfig (current)
-  // └─ .gitignore.js
-
-
-  return [null, null];
-};
-
-const moveToParent = (current, nodes) => {
-  const path = current.dataset.index.split('-');
-
-  if (path.length > 1) {
-    const item = current.parentElement.parentElement;
-    return [item, getNodeAt(nodes, item.dataset.index)];
-  }
-
-  return [null, null];
-};
-
-const getExpandState = node => {
-  const ariaExpandedAttribute = node.getAttribute('aria-expanded');
+const getExpandState = el => {
+  const ariaExpandedAttribute = el.getAttribute('aria-expanded');
   return {
     isExpandable: ariaExpandedAttribute !== null,
     isExpanded: ariaExpandedAttribute === 'true'
   };
 };
-
-const isLastItem = (item, nodes) => {
-  const path = item.dataset.index.split('-');
+const isLastTopLevelItem = (nodes, index) => {
+  const path = index.split('-');
   return path.length === 1 && parseInt(path[0], 10) === nodes.length - 1;
 };
-
 const shallowEquals = (prev, next, ignored) => {
   if (Object.is(prev, next)) {
     return true;
@@ -278,8 +131,8 @@ const TreeItem = _ref => {
       children: node.label
     }), isExpanded && isExpandable && /*#__PURE__*/jsx("ul", {
       role: "group",
-      children: node.nodes.map((node, childIndex) => /*#__PURE__*/jsx(MemoTreeItem, {
-        node: node,
+      children: node.nodes.map((n, childIndex) => /*#__PURE__*/jsx(MemoTreeItem, {
+        node: n,
         index: index + '-' + childIndex,
         selected: selected,
         focused: focused,
@@ -289,7 +142,7 @@ const TreeItem = _ref => {
         renderLabel: renderLabel,
         onItemSelect: onItemSelect,
         onKeyDown: onKeyDown
-      }, node.id))
+      }, n.id))
     })]
   });
 };
@@ -507,58 +360,161 @@ const TreeImpl = (_ref, ref) => {
 
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      const [item, node] = moveUp(e.currentTarget, nodes);
 
-      if (item) {
-        focusTreeItem(item, node);
+      if (e.currentTarget.dataset.index !== '0') {
+        if (e.currentTarget.previousElementSibling) {
+          // move back a node and find the deepest leaf node
+          let item = e.currentTarget.previousElementSibling;
+
+          while (true) {
+            const {
+              isExpanded,
+              isExpandable
+            } = getExpandState(item);
+
+            if (isExpandable && isExpanded) {
+              // ├─ node_modules
+              // │  └─ @babel
+              // │     ├─ code-frame
+              // │     └─ compat-data (next)
+              // ├─ src (current)
+              item = item.lastElementChild.lastElementChild;
+            } else {
+              break;
+            }
+          }
+
+          const node = getNodeAt(nodes, item.dataset.index);
+          focusTreeItem(node);
+        } else {
+          // ├─ node_modules
+          // │  └─ @babel (next)
+          // │     ├─ code-frame (current)
+          // │     └─ compat-data
+          const parent = getParentNode(nodes, e.currentTarget.dataset.index);
+
+          if (parent) {
+            focusTreeItem(parent);
+          }
+        }
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      const [item, node] = moveDown(e.currentTarget, nodes);
+      const {
+        isExpanded
+      } = getExpandState(e.currentTarget);
 
-      if (item) {
-        focusTreeItem(item, node);
+      if (isExpanded) {
+        // ├─ node_modules (current)
+        // │  └─ @babel (next)
+        // │     ├─ code-frame
+        // │     └─ compat-data
+        // ├─ src
+        const parent = getNodeAt(nodes, e.currentTarget.dataset.index);
+        focusTreeItem(parent.nodes[0]);
+      } else {
+        let item = e.currentTarget; // go to parent and find its next sibling until we find a node or reach the end of the tree
+        // ├─ node_modules
+        // │  └─ @babel
+        // │     ├─ code-frame
+        // │     └─ compat-data (current)
+        // ├─ src (next)
+
+        while (true) {
+          // ├─ node_modules
+          // │  └─ @babel
+          // │     ├─ code-frame
+          // │     └─ compat-data (current)
+          if (isLastTopLevelItem(nodes, item.dataset.index)) {
+            // we are at the end of the tree
+            break;
+          }
+
+          if (item.nextElementSibling) {
+            item = item.nextElementSibling;
+            break;
+          }
+
+          item = item.parentElement.parentElement;
+        }
+
+        if (item !== e.currentTarget) {
+          focusTreeItem(getNodeAt(nodes, item.dataset.index));
+        }
       }
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      const [item, node] = moveLeft(e.currentTarget, nodes);
+      const {
+        isExpandable,
+        isExpanded
+      } = getExpandState(e.currentTarget);
 
-      if (item) {
-        focusTreeItem(item, node);
-      }
-
-      if (!item && node) {
+      if (isExpandable && isExpanded) {
+        // ├─ src (current)
+        // │ ├─ App.jsx
+        // │ └─ data.js       -> ├─ src (next)
+        // ├─ .editorconfig      ├─ .editorconfig
+        // └─ .gitignore.js      └─ .gitignore.js
+        const node = getNodeAt(nodes, e.currentTarget.dataset.index);
         setExpanded(prev => prev.filter(id => id !== node.id));
         onExpandChange(node);
+      } else {
+        // ├─ src (next)
+        // │ ├─ App.jsx
+        // │ └─ data.js (current)
+        // ├─ .editorconfig
+        // └─ .gitignore.js
+        const parent = getParentNode(nodes, e.currentTarget.dataset.index);
+
+        if (parent) {
+          focusTreeItem(parent);
+        }
       }
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      const [item, node] = moveRight(e.currentTarget, nodes);
+      const {
+        isExpandable,
+        isExpanded
+      } = getExpandState(e.currentTarget);
 
-      if (item) {
-        focusTreeItem(item, node);
-      }
+      if (isExpandable) {
+        const node = getNodeAt(nodes, e.currentTarget.dataset.index);
 
-      if (!item && node) {
-        setExpanded(prev => prev.concat(node.id));
-        onExpandChange(node);
+        if (isExpanded) {
+          // ├─ src (current)
+          // │ ├─ App.jsx (next)
+          // │ └─ data.js
+          // ├─ .editorconfig
+          // └─ .gitignore.js
+          const next = node.nodes[0];
+          focusTreeItem(next);
+        } else {
+          // ├─ src (current)      ├─ src (next)
+          // ├─ .editorconfig      │ ├─ App.jsx
+          // └─ .gitignore.js   -> │ └─ data.js
+          //                       ├─ .editorconfig
+          //                       └─ .gitignore.js
+          setExpanded(prev => prev.concat(node.id));
+          onExpandChange(node);
+        }
       }
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       const node = getNodeAt(nodes, e.currentTarget.dataset.index);
       onItemSelect(node);
     }
-  }; // @todo since the el.focus() call was moved to the TreeItem we no longer need the el
+  };
 
+  const focusTreeItem = node => {
+    if (node.id !== focused) {
+      setCounter(prev => prev + 1);
+      setFocused(node.id);
+      onFocusChange(node);
 
-  const focusTreeItem = (el, node) => {
-    setCounter(prev => prev + 1);
-    setFocused(node.id);
-    onFocusChange(node);
-
-    if (selectionFollowsFocus) {
-      setSelected(node.id);
-      onSelectChange(node);
+      if (selectionFollowsFocus) {
+        setSelected(node.id);
+        onSelectChange(node);
+      }
     }
   };
 
@@ -702,8 +658,7 @@ const VirtualTreeImpl = (_ref, ref) => {
       } else {
         let range = new Set(defaultRange);
         const node = flattened[focusedIndex];
-        const path = node[internalId].split('-');
-        const parent = path.length > 1 ? getNodeAt(nodes, path.slice(0, -1).join('-')) : null;
+        const parent = getParentNode(nodes, node[internalId]);
 
         if (parent) {
           range.add(flattened.findIndex(node => node.id === parent.id));
@@ -773,7 +728,6 @@ const VirtualTreeImpl = (_ref, ref) => {
 
     if (e.key === 'ArrowUp') {
       e.preventDefault();
-      e.stopPropagation();
 
       if (flattened[0].id !== focused) {
         const index = flattened.findIndex(node => node.id === focused);
@@ -783,7 +737,6 @@ const VirtualTreeImpl = (_ref, ref) => {
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      e.stopPropagation();
 
       if (flattened[flattened.length - 1].id !== focused) {
         const index = flattened.findIndex(node => node.id === focused);
@@ -793,7 +746,6 @@ const VirtualTreeImpl = (_ref, ref) => {
       }
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      e.stopPropagation();
       const {
         isExpandable,
         isExpanded
@@ -806,10 +758,9 @@ const VirtualTreeImpl = (_ref, ref) => {
         onExpandChange(node);
         focusTreeItem(node);
       } else {
-        const path = e.currentTarget.dataset.index.split('-');
+        const parentNode = getParentNode(nodes, e.currentTarget.dataset.index);
 
-        if (path.length > 1) {
-          const parentNode = getNodeAt(nodes, path.slice(0, -1).join('-'));
+        if (parentNode) {
           const index = flattened.findIndex(node => node.id === parentNode.id);
           const node = flattened[index]; // we do this, because parentNode doesn't have node[internalId]
 
@@ -818,7 +769,6 @@ const VirtualTreeImpl = (_ref, ref) => {
       }
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      e.stopPropagation();
       const {
         isExpandable,
         isExpanded
@@ -841,7 +791,6 @@ const VirtualTreeImpl = (_ref, ref) => {
       }
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      e.stopPropagation();
       const node = getNodeAt(nodes, e.currentTarget.dataset.index);
       onItemSelect(node);
     }
@@ -852,11 +801,11 @@ const VirtualTreeImpl = (_ref, ref) => {
       setCounter(prev => prev + 1);
       setFocused(node.id);
       onFocusChange(node);
-    }
 
-    if (selectionFollowsFocus) {
-      setSelected(node.id);
-      onSelectChange(node);
+      if (selectionFollowsFocus) {
+        setSelected(node.id);
+        onSelectChange(node);
+      }
     }
   };
 
@@ -878,7 +827,7 @@ const VirtualTreeImpl = (_ref, ref) => {
         const path = node[internalId].split('-');
         const level = path.length;
         const positionInSet = parseInt(path[path.length - 1], 10) + 1;
-        const setSize = path.length === 1 ? nodes.length : getNodeAt(nodes, path.slice(0, -1).join('-')).nodes.length;
+        const setSize = path.length === 1 ? nodes.length : getParentNode(nodes, node[internalId]).nodes.length;
         const isExpandable = node.nodes.length > 0;
         const isExpanded = isExpandable ? expanded.includes(node.id) : null;
         return /*#__PURE__*/jsx(VirtualTreeItem$1, {

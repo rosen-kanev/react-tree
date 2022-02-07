@@ -5,7 +5,7 @@ import TreeItem from './TreeItem.jsx';
 import useInternalState from '../useInternalState.js';
 import basePropTypes from '../basePropTypes.js';
 
-import { moveUp, moveDown, moveLeft, moveRight, getNodeAt, noop, isUndefined } from '../utils.js';
+import { isLastTopLevelItem, getExpandState, getParentNode, getNodeAt, noop, isUndefined } from '../utils.js';
 
 /**
  * An accessible tree view component, based on the WAI-ARIA authoring practices for accessible widgets.
@@ -65,44 +65,138 @@ const TreeImpl = (
         if (e.key === 'ArrowUp') {
             e.preventDefault();
 
-            const [item, node] = moveUp(e.currentTarget, nodes);
+            if (e.currentTarget.dataset.index !== '0') {
+                if (e.currentTarget.previousElementSibling) {
+                    // move back a node and find the deepest leaf node
+                    let item = e.currentTarget.previousElementSibling;
 
-            if (item) {
-                focusTreeItem(item, node);
+                    while (true) {
+                        const { isExpanded, isExpandable } = getExpandState(item);
+
+                        if (isExpandable && isExpanded) {
+                            // ├─ node_modules
+                            // │  └─ @babel
+                            // │     ├─ code-frame
+                            // │     └─ compat-data (next)
+                            // ├─ src (current)
+                            item = item.lastElementChild.lastElementChild;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    const node = getNodeAt(nodes, item.dataset.index);
+
+                    focusTreeItem(node);
+                } else {
+                    // ├─ node_modules
+                    // │  └─ @babel (next)
+                    // │     ├─ code-frame (current)
+                    // │     └─ compat-data
+                    const parent = getParentNode(nodes, e.currentTarget.dataset.index);
+
+                    if (parent) {
+                        focusTreeItem(parent);
+                    }
+                }
             }
         } else if (e.key === 'ArrowDown') {
             e.preventDefault();
 
-            const [item, node] = moveDown(e.currentTarget, nodes);
+            const { isExpanded } = getExpandState(e.currentTarget);
 
-            if (item) {
-                focusTreeItem(item, node);
+            if (isExpanded) {
+                // ├─ node_modules (current)
+                // │  └─ @babel (next)
+                // │     ├─ code-frame
+                // │     └─ compat-data
+                // ├─ src
+                const parent = getNodeAt(nodes, e.currentTarget.dataset.index);
+
+                focusTreeItem(parent.nodes[0]);
+            } else {
+                let item = e.currentTarget;
+                // go to parent and find its next sibling until we find a node or reach the end of the tree
+                // ├─ node_modules
+                // │  └─ @babel
+                // │     ├─ code-frame
+                // │     └─ compat-data (current)
+                // ├─ src (next)
+                while (true) {
+                    // ├─ node_modules
+                    // │  └─ @babel
+                    // │     ├─ code-frame
+                    // │     └─ compat-data (current)
+                    if (isLastTopLevelItem(nodes, item.dataset.index)) {
+                        // we are at the end of the tree
+                        break;
+                    }
+
+                    if (item.nextElementSibling) {
+                        item = item.nextElementSibling;
+                        break;
+                    }
+
+                    item = item.parentElement.parentElement;
+                }
+
+                if (item !== e.currentTarget) {
+                    focusTreeItem(getNodeAt(nodes, item.dataset.index));
+                }
             }
         } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
 
-            const [item, node] = moveLeft(e.currentTarget, nodes);
+            const { isExpandable, isExpanded } = getExpandState(e.currentTarget);
 
-            if (item) {
-                focusTreeItem(item, node);
-            }
+            if (isExpandable && isExpanded) {
+                // ├─ src (current)
+                // │ ├─ App.jsx
+                // │ └─ data.js       -> ├─ src (next)
+                // ├─ .editorconfig      ├─ .editorconfig
+                // └─ .gitignore.js      └─ .gitignore.js
+                const node = getNodeAt(nodes, e.currentTarget.dataset.index);
 
-            if (!item && node) {
                 setExpanded((prev) => prev.filter((id) => id !== node.id));
                 onExpandChange(node);
+            } else {
+                // ├─ src (next)
+                // │ ├─ App.jsx
+                // │ └─ data.js (current)
+                // ├─ .editorconfig
+                // └─ .gitignore.js
+                const parent = getParentNode(nodes, e.currentTarget.dataset.index);
+
+                if (parent) {
+                    focusTreeItem(parent);
+                }
             }
         } else if (e.key === 'ArrowRight') {
             e.preventDefault();
 
-            const [item, node] = moveRight(e.currentTarget, nodes);
+            const { isExpandable, isExpanded } = getExpandState(e.currentTarget);
 
-            if (item) {
-                focusTreeItem(item, node);
-            }
+            if (isExpandable) {
+                const node = getNodeAt(nodes, e.currentTarget.dataset.index);
 
-            if (!item && node) {
-                setExpanded((prev) => prev.concat(node.id));
-                onExpandChange(node);
+                if (isExpanded) {
+                    // ├─ src (current)
+                    // │ ├─ App.jsx (next)
+                    // │ └─ data.js
+                    // ├─ .editorconfig
+                    // └─ .gitignore.js
+                    const next = node.nodes[0];
+
+                    focusTreeItem(next);
+                } else {
+                    // ├─ src (current)      ├─ src (next)
+                    // ├─ .editorconfig      │ ├─ App.jsx
+                    // └─ .gitignore.js   -> │ └─ data.js
+                    //                       ├─ .editorconfig
+                    //                       └─ .gitignore.js
+                    setExpanded((prev) => prev.concat(node.id));
+                    onExpandChange(node);
+                }
             }
         } else if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -113,16 +207,16 @@ const TreeImpl = (
         }
     };
 
-    // @todo since the el.focus() call was moved to the TreeItem we no longer need the el
-    const focusTreeItem = (el, node) => {
-        setCounter((prev) => prev + 1);
+    const focusTreeItem = (node) => {
+        if (node.id !== focused) {
+            setCounter((prev) => prev + 1);
+            setFocused(node.id);
+            onFocusChange(node);
 
-        setFocused(node.id);
-        onFocusChange(node);
-
-        if (selectionFollowsFocus) {
-            setSelected(node.id);
-            onSelectChange(node);
+            if (selectionFollowsFocus) {
+                setSelected(node.id);
+                onSelectChange(node);
+            }
         }
     };
 
