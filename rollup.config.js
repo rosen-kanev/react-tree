@@ -5,7 +5,7 @@ import commonjs from '@rollup/plugin-commonjs';
 import { terser } from 'rollup-plugin-terser';
 
 const input = 'src/index.js';
-const name = 'react-tree';
+const name = 'react-crann';
 
 const getBabelConfig = (runtime) => {
     return {

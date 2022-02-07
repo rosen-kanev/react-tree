@@ -1,5 +1,5 @@
 {
-  "name": "react-tree",
+  "name": "react-crann",
   "version": "0.1.0",
   "description": "An accessible tree view component",
   "license": "MIT",
@@ -14,12 +14,12 @@
     "dist",
     "index.d.ts"
   ],
-  "main": "./dist/react-tree.umd.js",
-  "module": "./dist/react-tree.esm.js",
+  "main": "./dist/react-crann.umd.js",
+  "module": "./dist/react-crann.esm.js",
   "exports": {
     ".": {
-      "import": "./dist/react-tree.esm.js",
-      "require": "./dist/react-tree.umd.js"
+      "import": "./dist/react-crann.esm.js",
+      "require": "./dist/react-crann.umd.js"
     }
   },
   "typings": "./index.d.ts",
