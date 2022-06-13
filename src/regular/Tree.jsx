@@ -51,10 +51,12 @@ const TreeImpl = (
     useImperativeHandle(ref, () => {
         return {
             focus() {
-                setCounter((prev) => prev + 1);
+                setNeedsRefocus(true);
             },
         };
     });
+
+    const [needsRefocus, setNeedsRefocus] = useState(false);
 
     const onKeyDown = (e) => {
         /* istanbul ignore next we test this, but the code coverage tool is still unconvinced */
@@ -249,6 +251,8 @@ const TreeImpl = (
                     expanded={expanded}
                     setSize={nodes.length}
                     counter={counter}
+                    needsRefocus={needsRefocus}
+                    setNeedsRefocus={setNeedsRefocus}
                     renderLabel={renderLabel}
                     onItemSelect={onItemSelect}
                     onKeyDown={onKeyDown}

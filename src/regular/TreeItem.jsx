@@ -1,4 +1,4 @@
-import { useRef, useEffect, memo } from 'react';
+import { useCallback, useRef, useEffect, memo } from 'react';
 
 import { isFn, shallowEquals } from '../utils';
 
@@ -10,6 +10,8 @@ const TreeItem = ({
     expanded,
     setSize,
     counter,
+    needsRefocus,
+    setNeedsRefocus,
     onItemSelect,
     renderLabel,
     onKeyDown,
@@ -22,14 +24,31 @@ const TreeItem = ({
 
     const el = useRef();
 
-    useEffect(() => {
-        if (counter > 0 && focused === node.id) {
-            if (el.current) {
-                el.current.focus();
-                el.current.firstElementChild.scrollIntoView({ block: 'nearest' });
+    const focus = useCallback((reset) => {
+        if (el.current) {
+            el.current.focus();
+            el.current.firstElementChild.scrollIntoView({ block: 'nearest' });
+
+            if (reset) {
+                setNeedsRefocus(false);
             }
         }
+    }, []);
+
+    // handles ArrowUp/Down/Left/Right focus management
+    useEffect(() => {
+        // counter > 0 is here only to avoid calling focus() when the component mounts for the first time
+        if (counter > 0 && focused === node.id) {
+            focus();
+        }
     }, [counter]);
+
+    // handles imperative change of focus
+    useEffect(() => {
+        if (needsRefocus && focused === node.id) {
+            focus(true);
+        }
+    }, [needsRefocus]);
 
     return (
         <li
@@ -62,6 +81,8 @@ const TreeItem = ({
                             expanded={expanded}
                             setSize={node.nodes.length}
                             counter={counter}
+                            needsRefocus={needsRefocus}
+                            setNeedsRefocus={setNeedsRefocus}
                             renderLabel={renderLabel}
                             onItemSelect={onItemSelect}
                             onKeyDown={onKeyDown}
@@ -80,7 +101,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 const propsAreEqual = (prev, next) => {
     // ignore object identity of these props
-    const ignored = ['counter', 'selected', 'focused', 'expanded', 'onItemSelect', 'onKeyDown'];
+    const ignored = ['counter', 'needsRefocus', 'selected', 'focused', 'expanded', 'onItemSelect', 'onKeyDown'];
     const areOtherPropsDifferent = !shallowEquals(prev, next, ignored);
 
     if (areOtherPropsDifferent) {
