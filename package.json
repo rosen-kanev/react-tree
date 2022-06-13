@@ -52,7 +52,7 @@
     "vite": "2.7.7"
   },
   "peerDependencies": {
-    "react": "^16.14.0 || ^17.x",
+    "react": "^16.14.0 || ^17.x || ^18.x",
     "react-virtual": "^2.10.0"
   },
   "keywords": [
