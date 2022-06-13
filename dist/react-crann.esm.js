@@ -1,4 +1,4 @@
-import { memo, useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react';
+import { memo, useRef, useCallback, useEffect, useState, forwardRef, useImperativeHandle, useMemo } from 'react';
 import { jsxs, jsx } from 'react/jsx-runtime';
 import PropTypes from 'prop-types';
 import { useVirtual, defaultRangeExtractor } from 'react-virtual';
@@ -93,6 +93,8 @@ const TreeItem = _ref => {
     expanded,
     setSize,
     counter,
+    needsRefocus,
+    setNeedsRefocus,
     onItemSelect,
     renderLabel,
     onKeyDown
@@ -102,16 +104,31 @@ const TreeItem = _ref => {
   const path = index.split('-');
   const positionInSet = parseInt(path[path.length - 1], 10) + 1;
   const el = useRef();
-  useEffect(() => {
-    if (counter > 0 && focused === node.id) {
-      if (el.current) {
-        el.current.focus();
-        el.current.firstElementChild.scrollIntoView({
-          block: 'nearest'
-        });
+  const focus = useCallback(reset => {
+    if (el.current) {
+      el.current.focus();
+      el.current.firstElementChild.scrollIntoView({
+        block: 'nearest'
+      });
+
+      if (reset) {
+        setNeedsRefocus(false);
       }
     }
-  }, [counter]);
+  }, []); // handles ArrowUp/Down/Left/Right focus management
+
+  useEffect(() => {
+    // counter > 0 is here only to avoid calling focus() when the component mounts for the first time
+    if (counter > 0 && focused === node.id) {
+      focus();
+    }
+  }, [counter]); // handles imperative change of focus
+
+  useEffect(() => {
+    if (needsRefocus && focused === node.id) {
+      focus(true);
+    }
+  }, [needsRefocus]);
   return /*#__PURE__*/jsxs("li", {
     ref: el,
     role: "treeitem",
@@ -139,6 +156,8 @@ const TreeItem = _ref => {
         expanded: expanded,
         setSize: node.nodes.length,
         counter: counter,
+        needsRefocus: needsRefocus,
+        setNeedsRefocus: setNeedsRefocus,
         renderLabel: renderLabel,
         onItemSelect: onItemSelect,
         onKeyDown: onKeyDown
@@ -155,7 +174,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 const propsAreEqual = (prev, next) => {
   // ignore object identity of these props
-  const ignored = ['counter', 'selected', 'focused', 'expanded', 'onItemSelect', 'onKeyDown'];
+  const ignored = ['counter', 'needsRefocus', 'selected', 'focused', 'expanded', 'onItemSelect', 'onKeyDown'];
   const areOtherPropsDifferent = !shallowEquals(prev, next, ignored);
 
   if (areOtherPropsDifferent) {
@@ -346,11 +365,12 @@ const TreeImpl = (_ref, ref) => {
   useImperativeHandle(ref, () => {
     return {
       focus() {
-        setCounter(prev => prev + 1);
+        setNeedsRefocus(true);
       }
 
     };
   });
+  const [needsRefocus, setNeedsRefocus] = useState(false);
 
   const onKeyDown = e => {
     /* istanbul ignore next we test this, but the code coverage tool is still unconvinced */
@@ -546,6 +566,8 @@ const TreeImpl = (_ref, ref) => {
       expanded: expanded,
       setSize: nodes.length,
       counter: counter,
+      needsRefocus: needsRefocus,
+      setNeedsRefocus: setNeedsRefocus,
       renderLabel: renderLabel,
       onItemSelect: onItemSelect,
       onKeyDown: onKeyDown
